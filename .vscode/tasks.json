@@ -17,7 +17,7 @@
                 "-Path",
                 "*.py",
                 "-DestinationPath",
-                "calibre-remarkable-resync.zip",
+                "out/calibre-remarkable-resync.zip",
                 "-Force"
             ],
             "label": "publish",
