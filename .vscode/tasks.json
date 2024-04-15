@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "command": "C:\\Program Files\\Calibre2\\calibre-debug.exe",
+            "args": [
+                "-g"
+            ],
+            "label": "calibre-debug",
+        },
+        {
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "Compress-Archive",
+                "-Path",
+                "*.py",
+                "-DestinationPath",
+                "calibre-remarkable-resync.zip",
+                "-Force"
+            ],
+            "label": "publish",
+            "problemMatcher": []
+        }
+    ]
+}

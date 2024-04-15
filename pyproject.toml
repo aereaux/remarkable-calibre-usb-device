@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "calibre-remarkable-usb-device"
+version = "0.1.0"
+description = ""
+authors = ["Andri Rakotomalala <andriniaina@gmail.com>"]
+readme = "README.md"
+packages = [{include = "calibre_remarkable_usb_device"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+ipykernel = "^6.29.4"
+requests = "^2.31.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
