@@ -20,7 +20,7 @@ ssh_options="-o BatchMode=yes"
 ssh_socket_options = f" -S {ssh_socketfile}" if os.name != 'nt' else ""
 
 class Options():
-	output_destination = None
+	output_destination = "calibre"
 	dryrun = False
 	verbosity = 100
 	exclude_patterns = []
