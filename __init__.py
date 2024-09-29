@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from calibre.devices.interface import DevicePlugin
-from . import resync
+#from . import resync
 import random
 import os
 import shutil
 
-
+print("----------------------------------- LOAD REMARKABLE PLUGIN ------------------------")
 device = None
 
 
@@ -16,17 +16,19 @@ def dummy_set_progress_reporter(*args, **kwargs):
 
 @dataclass
 class RemarkableDeviceDescription:
-    random_id = random.randint(0, 9999999999999)
-    IP = "192.168.0.23"
+    IP = "http://10.11.99.1/"
+
+    def __init__(self):
+        self.random_id = random.randint(0, 9999999999999)
 
     def __str__(self) -> str:
-        return f"{self.IP}:{self.random_id}"
+        return f"Remarkable on {self.IP}, id={self.random_id}"
 
 
 class RemarkableUsbDevice(DevicePlugin):
-    name = "Remarkable Plugin"
+    name = "Remarkable Plugin for Calibre, Andri"
     description = "Send files to Remarkable"
-    author = "Nathan Aclander"
+    author = "Andri Rakotomalala"
     supported_platforms = ["linux", "windows", "osx"]
     version = (1, 2, 3)  # The version number of this plugin
     minimum_calibre_version = (0, 7, 53)
@@ -44,9 +46,10 @@ class RemarkableUsbDevice(DevicePlugin):
         global device
         try:
             if device is None:
-                resync.open_connection()
+                #resync.open_connection()
                 device = RemarkableDeviceDescription()
-                print(f"detected {device}")
+                print(f"detected new {device}")
+            print(f"returning device={device}")
             return device
         except Exception as e:
             print(f"No device detected {e}")
@@ -61,7 +64,10 @@ class RemarkableUsbDevice(DevicePlugin):
 
     def books(self, oncard=None, end_session=True):
         print("---------------- books")
-        return resync.get_toplevel_files()
+        #return resync.get_toplevel_files()
+        return [
+
+        ]
 
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata=None
@@ -75,18 +81,20 @@ class RemarkableUsbDevice(DevicePlugin):
             shutil.copy(path_old, path_new)
             files.append(path_new)
         print(files)
-        resync.push(files)
+        #resync.push(files) 
 
     def open(self, connected_device, library_uuid):
         print(f"opening {connected_device}")
 
     def is_usb_connected(self, devices_on_system, debug=False, only_presence=False):
         print("is_usb_connected")
-        return True
+        global device
+        return True, device
 
     def eject(self):
+        global device
         print("ejecting")
-        resync.close_connection()
+        #resync.close_connection()
         device = None
 
     def get_device_information(self, end_session=True):
