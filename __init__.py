@@ -1,13 +1,21 @@
+from __future__ import annotations
+
+import os
+
+import random
+import shutil
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, List
+
 from calibre.devices.interface import DevicePlugin
 
-# from . import resync
-import random
-import os
-import shutil
+from . import rm_web_interface
+
+if TYPE_CHECKING:
+    from calibre.devices.usbms.device import USBDevice
 
 print(
-    "----------------------------------- LOAD REMARKABLE PLUGIN ------------------------"
+    "----------------------------------- LOAD REMARKABLE PLUGIN web interface ------------------------"
 )
 device = None
 
@@ -29,21 +37,20 @@ def log_args_kwargs(func):
 
 @dataclass
 class RemarkableDeviceDescription:
-    IP = "http://10.11.99.1/"
-
-    def __init__(self):
+    def __init__(self, ip):
+        self.ip = ip
         self.random_id = random.randint(0, 9999999999999)
 
     def __str__(self) -> str:
-        return f"Remarkable on {self.IP}, id={self.random_id}"
+        return f"Remarkable on http://{self.ip}, rid={self.random_id}"
 
 
 class RemarkableUsbDevice(DevicePlugin):
-    name = "Remarkable Plugin for Calibre, Andri"
+    name = "Remarkable Device Plugin for Calibre"
     description = "Send files to Remarkable"
     author = "Andri Rakotomalala"
     supported_platforms = ["linux", "windows", "osx"]
-    version = (1, 2, 3)  # The version number of this plugin
+    version = (0, 1, 1)  # The version number of this plugin
     minimum_calibre_version = (0, 7, 53)
 
     FORMATS = ["epub", "pdf"]
@@ -55,12 +62,12 @@ class RemarkableUsbDevice(DevicePlugin):
         super().startup()
 
     @log_args_kwargs
-    def detect_managed_devices(self, devices_on_system, force_refresh=False):
+    def detect_managed_devices(self, devices_on_system:List[USBDevice], force_refresh=False):
         global device
         try:
-            if device is None:
-                # resync.open_connection()
-                device = RemarkableDeviceDescription()
+            # TODO: check for USBDevice.vendor_id
+            if device is None and rm_web_interface.check_connection():
+                device = RemarkableDeviceDescription(rm_web_interface.IP)
                 print(f"detected new {device}")
             print(f"returning device={device}")
             return device
@@ -78,15 +85,13 @@ class RemarkableUsbDevice(DevicePlugin):
 
     @log_args_kwargs
     def books(self, oncard=None, end_session=True):
-        print("---------------- books")
-        # return resync.get_toplevel_files()
-        return []
+        return rm_web_interface.query_tree("").ls_recursive()
 
     @log_args_kwargs
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata=None
     ):
-        print(f"pushing {files_original}")
+        print(f"pushing {files_original} with metadata={metadata}")
         # TODO rename in another temp folder
         files = []
         for path_old, visible_name in zip(files_original, names):
@@ -98,12 +103,11 @@ class RemarkableUsbDevice(DevicePlugin):
             shutil.copy(path_old, path_new)
             files.append(path_new)
         print(files)
-        # resync.push(files)
+        rm_web_interface.upload(files)
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
         print(f"opening {connected_device}")
-#        raise NotImplementedError()
 
     @log_args_kwargs
     def is_usb_connected(self, devices_on_system, debug=False, only_presence=False):
@@ -113,7 +117,6 @@ class RemarkableUsbDevice(DevicePlugin):
     @log_args_kwargs
     def eject(self):
         global device
-        # resync.close_connection()
         device = None
 
     @log_args_kwargs
