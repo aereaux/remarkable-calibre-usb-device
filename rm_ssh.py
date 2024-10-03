@@ -14,6 +14,7 @@ import pathlib
 import urllib.request
 import re
 import time
+from .helpers import log_args_kwargs
 
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
@@ -24,12 +25,25 @@ ssh_options = "-o BatchMode=yes"
 ssh_socket_options = f" -S {ssh_socketfile}" if os.name != "nt" else ""
 
 
+@log_args_kwargs
 def xochitl_restart(ip):
     cmd = f'ssh {ssh_options} {ssh_socket_options} root@{ip} "systemctl restart xochitl"'
     subprocess.getoutput(cmd)
 
+@log_args_kwargs
+def test_connection(ip):
+    print("Sending dummy command on SSH")
+    p = subprocess.Popen(
+        f'ssh {ssh_options} root@{ip} "/bin/true"',
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    p.wait()
+    return p.returncode == 0
 
-def mkdir(ip, visible_name, parent_id):
+@log_args_kwargs
+def mkdir(ip, visible_name, parent_id=""):
     file_id = str(uuid.uuid4())
     with tempfile.TemporaryDirectory() as tmp_folder:
         file_metadata = f"{file_id}.metadata"

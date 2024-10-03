@@ -9,8 +9,6 @@ from enum import Enum
 from urllib import parse as urllib_parse
 from urllib import request
 
-IP = "10.11.99.1"
-base_url = f"http://{IP}"
 HEADERS__CONTENT_TYPE__JSON = {"Content-Type": "application/json"}
 HEADERS__CHARSET__ISO88591 = {"charset": "ISO-8859-1"}
 
@@ -55,6 +53,24 @@ class Node:
                 result.extend(ls_children)
             else:
                 result.append(c.visible_name)
+        return result
+    
+    def ls_dir_recursive(self: "Node"):
+        result = []
+        for c in self.children:
+            if c.document.Type == TypeOfDocument.CollectionType:
+                ls_children = list(map(lambda path: f"{c.visible_name}/{path}", c.ls_dir_recursive()))
+                result.extend(ls_children)
+        return result
+
+    def ls_dir_recursive_dict(self: "Node"):
+        result = {}
+        for c in self.children:
+            if c.document.Type == TypeOfDocument.CollectionType:
+                result.update({
+                    f"{c.visible_name}/{name}": id
+                    for name,id in c.ls_dir_recursive_dict().items()
+                })
         return result
 
 
@@ -139,7 +155,8 @@ class MultiPartForm:
 # %%
 
 
-def query_document(path_id, **kwargs):
+def query_document(ip, path_id, **kwargs):
+    base_url = f"http://{ip}"
     headers = {}
     headers.update(HEADERS__CONTENT_TYPE__JSON)
     headers.update(HEADERS__CHARSET__ISO88591)
@@ -155,15 +172,19 @@ def query_document(path_id, **kwargs):
 #    http_response = https_response = lambda self, request, response: response
 
 
-def upload_file(path, visible_name, **kwargs):
+def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
+    base_url = f"http://{ip}"
     headers = {
-        "Origin": f"http://{IP}",
+        "Origin": f"{base_url}",
         "Accept": "*/*",
-        "Referer": f"http://{IP}/",
+        "Referer": f"{base_url}/",
         "Connection": "keep-alive",
     }
 
-    with open(path, "rb") as fp:
+    if folder_id:
+        query_document(ip, folder_id)
+
+    with open(local_path, "rb") as fp:
         url = f"{base_url}/upload"
         form = MultiPartForm()
         form.add_file("file", visible_name, fp)
@@ -181,17 +202,19 @@ def upload_file(path, visible_name, **kwargs):
             return json.loads(conn.read())
 
 
-def check_connection():
+def check_connection(ip:str):
+    base_url = f"http://{ip}"
+
     try:
-        query_document("", timeout=2)
+        query_document(ip, "", timeout=2)
         return True
     except Exception as e:
         print(f"Unable to connect to remarkable: {e}")
         return False
 
 
-def query_tree(path_id):
-    document_list_jsond = query_document(path_id)
+def query_tree(ip, path_id):
+    document_list_jsond = query_document(ip, path_id)
     root = Node()
     id_to_obj = {path_id: root}
     documents: list[Document] = list(sorted((Document.parse(r) for r in document_list_jsond), key=lambda d: d.Parent))
@@ -200,9 +223,11 @@ def query_tree(path_id):
         node = ChildNode(document=d)
         id_to_obj[d.Parent].children.append(node)
         if d.Type == TypeOfDocument.CollectionType:
-            node.children.extend(query_tree(d.ID).children)
+            node.children.extend(query_tree(ip, d.ID).children)
 
     return root
+
+
 
 
 # %%

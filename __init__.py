@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import tempfile
 
 import random
@@ -12,26 +13,22 @@ from calibre.devices.interface import DevicePlugin
 from calibre.ebooks.metadata.book.base import Metadata
 
 # from . import rm_web_interface
-from . import rm_web_interface_dummy as rm_web_interface
+from .helpers import log_args_kwargs
+from . import rm_web_interface as rm_web_interface
+from . import rm_ssh
 
 if TYPE_CHECKING:
     from calibre.devices.usbms.device import USBDevice
 
-print("----------------------------------- LOAD REMARKABLE PLUGIN web interface ------------------------")
+print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
 device = None
-
+BASE_REMOTE_FOLDER = "calibre"
+IP = "10.11.99.1"
 
 def dummy_set_progress_reporter(*args, **kwargs):
     print("dummy_set_progress_reporter")
     return 100
 
-
-def log_args_kwargs(func):
-    def wrapper(*args, **kwargs):
-        print(f"__ calibre-remarkable-usb-device call: {func.__name__}, Arguments: {args}, Keyword Arguments: {kwargs}")
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 @dataclass
@@ -65,8 +62,8 @@ class RemarkableUsbDevice(DevicePlugin):
         global device
         try:
             # TODO: check for USBDevice.vendor_id
-            if device is None and rm_web_interface.check_connection():
-                device = RemarkableDeviceDescription(rm_web_interface.IP)
+            if device is None and rm_web_interface.check_connection(IP):
+                device = RemarkableDeviceDescription(IP)
                 print(f"detected new {device}")
             print(f"returning device={device}")
             return device
@@ -84,19 +81,39 @@ class RemarkableUsbDevice(DevicePlugin):
 
     @log_args_kwargs
     def books(self, oncard=None, end_session=True):
-        return rm_web_interface.query_tree("").ls_recursive()
+        return rm_web_interface.query_tree(IP, "").ls_recursive()
 
     @log_args_kwargs
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
     ):
+        needs_reboot = False
+        has_ssh = rm_ssh.test_connection(IP)
+        existing_folders = rm_web_interface.query_tree(IP, "").ls_dir_recursive_dict()
         if not metadata:
             metadata = [None] * len(files_original)
-        with tempfile.TemporaryDirectory() as tmp_folder:
-            for path, visible_name, m in zip(files_original, names, metadata):
-                title = m.title
-                author = m.author_sort or m.author
-                rm_web_interface.upload_file(path, visible_name)
+        for path, visible_name, m in zip(files_original, names, metadata):
+            author = m.author_sort or m.author or ""
+
+            folder_id = ""
+            if has_ssh:
+                if BASE_REMOTE_FOLDER:
+                    folder_id = existing_folders.get(BASE_REMOTE_FOLDER)
+                    if not folder_id:
+                        folder_id = rm_ssh.mkdir(IP, BASE_REMOTE_FOLDER, "")
+                        needs_reboot=True
+
+                if author:
+                    remote_folder = pathlib.Path(BASE_REMOTE_FOLDER, author).as_posix()
+                    folder_id = existing_folders.get(remote_folder)
+                    if not folder_id:
+                        folder_id = rm_ssh.mkdir(IP, author, BASE_REMOTE_FOLDER)
+                        needs_reboot=True
+
+            rm_web_interface.upload_file(IP, path, folder_id, visible_name)
+        
+        if needs_reboot:
+            rm_ssh.xochitl_restart()
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):

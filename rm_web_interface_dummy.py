@@ -8,8 +8,6 @@ import json
 from urllib import request, parse as urllib_parse
 
 
-IP = "10.11.99.1"
-base_url = f"http://{IP}"
 HEADERS__CONTENT_TYPE__JSON = {"Content-Type": "application/json"}
 HEADERS__CHARSET__ISO88591 = {"charset": "ISO-8859-1"}
 
@@ -47,7 +45,7 @@ class Node:
     children: list["ChildNode"] = dataclasses.field(default_factory=list)
 
     def ls_recursive(self: "Node"):
-        result = []
+        result: list[str] = []
         for c in self.children:
             if c.document.Type == TypeOfDocument.CollectionType:
                 ls_children = list(map(lambda path: f"{c.visible_name}/{path}", c.ls_recursive()))
@@ -55,6 +53,10 @@ class Node:
             else:
                 result.append(c.visible_name)
         return result
+    def ls_dir_recursive(self: "Node"):
+        return []
+    def ls_dir_recursive_dict(self: "Node"):
+        return {}
 
 
 @dataclasses.dataclass
@@ -138,27 +140,19 @@ class MultiPartForm:
 # %%
 
 
-def query_document(path_id, **kwargs):
-    headers = {}
-    headers.update(HEADERS__CONTENT_TYPE__JSON)
-    headers.update(HEADERS__CHARSET__ISO88591)
-    url = f"{base_url}/documents/{path_id}"
-    req = request.Request(url)
-    for k, v in headers.items():
-        req.add_header(k, v)
-    with request.urlopen(req, **kwargs) as conn:
-        return json.loads(conn.read())
-
-
-def upload_file(filename, filepath, **kwargs):
+def query_document(ip, path_id, **kwargs):
     pass
 
 
-def check_connection():
+def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
+    pass
+
+
+def check_connection(ip:str):
     return True
 
 
-def query_tree(path_id):
+def query_tree(ip, path_id):
     root = Node()
     return root
 
