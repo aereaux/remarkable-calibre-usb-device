@@ -1,13 +1,12 @@
 # %%
-import dataclasses
-import io
-import json
-import mimetypes
-import os
-import uuid
 from enum import Enum
-from urllib import parse as urllib_parse
-from urllib import request
+import mimetypes
+import uuid
+import io
+import dataclasses
+import json
+from urllib import request, parse as urllib_parse
+
 
 IP = "10.11.99.1"
 base_url = f"http://{IP}"
@@ -151,57 +150,16 @@ def query_document(path_id, **kwargs):
         return json.loads(conn.read())
 
 
-# class NonRaisingHTTPErrorProcessor(request.HTTPErrorProcessor):
-#    http_response = https_response = lambda self, request, response: response
-
-
-def upload_file(path, visible_name, **kwargs):
-    headers = {
-        "Origin": f"http://{IP}",
-        "Accept": "*/*",
-        "Referer": f"http://{IP}/",
-        "Connection": "keep-alive",
-    }
-
-    with open(path, "rb") as fp:
-        url = f"{base_url}/upload"
-        form = MultiPartForm()
-        form.add_file("file", visible_name, fp)
-        data = bytes(form)
-        req = request.Request(url, data=data)
-        for k, v in headers.items():
-            req.add_header(k, v)
-        req.add_header("Content-Length", len(data))
-        req.add_header("Content-Type", form.get_content_type())
-        print(req)
-        # opener = request.build_opener(NonRaisingHTTPErrorProcessor)
-        # with opener.open(req, **kwargs) as conn:
-        with request.urlopen(req, **kwargs) as conn:
-            print(conn.status)
-            return json.loads(conn.read())
+def upload_file(filename, filepath, **kwargs):
+    pass
 
 
 def check_connection():
-    try:
-        query_document("", timeout=2)
-        return True
-    except Exception as e:
-        print(f"Unable to connect to remarkable: {e}")
-        return False
+    return True
 
 
 def query_tree(path_id):
-    document_list_jsond = query_document(path_id)
     root = Node()
-    id_to_obj = {path_id: root}
-    documents: list[Document] = list(sorted((Document.parse(r) for r in document_list_jsond), key=lambda d: d.Parent))
-    for d in documents:
-        id_to_obj[d.ID] = d
-        node = ChildNode(document=d)
-        id_to_obj[d.Parent].children.append(node)
-        if d.Type == TypeOfDocument.CollectionType:
-            node.children.extend(query_tree(d.ID).children)
-
     return root
 
 

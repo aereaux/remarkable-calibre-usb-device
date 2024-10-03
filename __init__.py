@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import os
+import tempfile
 
 import random
 import shutil
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Optional
 
 from calibre.devices.interface import DevicePlugin
+from calibre.ebooks.metadata.book.base import Metadata
 
-from . import rm_web_interface
+# from . import rm_web_interface
+from . import rm_web_interface_dummy as rm_web_interface
 
 if TYPE_CHECKING:
     from calibre.devices.usbms.device import USBDevice
 
-print(
-    "----------------------------------- LOAD REMARKABLE PLUGIN web interface ------------------------"
-)
+print("----------------------------------- LOAD REMARKABLE PLUGIN web interface ------------------------")
 device = None
 
 
@@ -27,9 +28,7 @@ def dummy_set_progress_reporter(*args, **kwargs):
 
 def log_args_kwargs(func):
     def wrapper(*args, **kwargs):
-        print(
-            f"__ calibre-remarkable-usb-device call: {func.__name__}, Arguments: {args}, Keyword Arguments: {kwargs}"
-        )
+        print(f"__ calibre-remarkable-usb-device call: {func.__name__}, Arguments: {args}, Keyword Arguments: {kwargs}")
         return func(*args, **kwargs)
 
     return wrapper
@@ -62,7 +61,7 @@ class RemarkableUsbDevice(DevicePlugin):
         super().startup()
 
     @log_args_kwargs
-    def detect_managed_devices(self, devices_on_system:List[USBDevice], force_refresh=False):
+    def detect_managed_devices(self, devices_on_system: List[USBDevice], force_refresh=False):
         global device
         try:
             # TODO: check for USBDevice.vendor_id
@@ -89,21 +88,15 @@ class RemarkableUsbDevice(DevicePlugin):
 
     @log_args_kwargs
     def upload_books(
-        self, files_original, names, on_card=None, end_session=True, metadata=None
+        self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
     ):
-        print(f"pushing {files_original} with metadata={metadata}")
-        # TODO rename in another temp folder
-        files = []
-        for path_old, visible_name in zip(files_original, names):
-            cryptic_name, directory = (
-                os.path.basename(path_old),
-                os.path.dirname(path_old),
-            )
-            path_new = os.path.join(directory, f"{visible_name}")
-            shutil.copy(path_old, path_new)
-            files.append(path_new)
-        print(files)
-        rm_web_interface.upload(files)
+        if not metadata:
+            metadata = [None] * len(files_original)
+        with tempfile.TemporaryDirectory() as tmp_folder:
+            for path, visible_name, m in zip(files_original, names, metadata):
+                title = m.title
+                author = m.author_sort or m.author
+                rm_web_interface.upload_file(path, visible_name)
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
@@ -207,7 +200,7 @@ class RemarkableUsbDevice(DevicePlugin):
 
     @log_args_kwargs
     def sync_booklists(self, booklists, end_session=True):
-        pass # on remarkable, metadata will be automatically be updated
+        pass  # on remarkable, metadata will be automatically be updated for epubs
 
     @log_args_kwargs
     def prepare_addable_books(self, paths):
@@ -260,8 +253,7 @@ class RemarkableUsbDevice(DevicePlugin):
     @classmethod
     @log_args_kwargs
     def add_books_to_metadata(cls, locations, metadata, booklists):
-        print("add_books_to_metadata")
-
+        pass
 
     @classmethod
     def settings(cls):

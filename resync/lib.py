@@ -25,12 +25,12 @@ class Options():
 	verbosity = 100
 	exclude_patterns = []
 	conflict_behavior = "replace" # skip
-	ssh_destination = '192.168.0.23'
+	ssh_destination = '10.11.99.1'
 	prepdir = default_prepdir
 	debug = False
 	mode = 'push'
 
-options = Options()
+options = Options()  # FIXME set this somewhere
 
 
 class FileCollision(Exception):
