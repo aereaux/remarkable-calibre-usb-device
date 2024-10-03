@@ -4,8 +4,6 @@ import mimetypes
 import uuid
 import io
 import dataclasses
-import json
-from urllib import request, parse as urllib_parse
 
 
 HEADERS__CONTENT_TYPE__JSON = {"Content-Type": "application/json"}

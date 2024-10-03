@@ -1,18 +1,12 @@
 #!/usr/bin/env python3
 
-import sys
 import uuid
 import os
 import time
-import json
-import shutil
-import argparse
 import uuid
 import subprocess
 import tempfile
 import pathlib
-import urllib.request
-import re
 import time
 from .helpers import log_args_kwargs
 

@@ -2,13 +2,8 @@
 # https://github.com/cherti/remarkable-cli-tooling/blob/4876f3cecbd6c2365441e24ec4d113d613159362/resync.py#L12
 # https://github.com/sergei-mironov/remarkable-cli-tooling/tree/ceccaf4b2c30fcbaad0a7f3397147763c0e35f5e
 # %%
-import rm_ssh
-
-IP="10.11.99.1"
-rm_ssh.mkdir(IP, "test_andri", "")
-rm_ssh.xochitl_restart(IP)
-# %%
 import rm_web_interface
+rm_web_interface.upload_file("10.11.99.1", r"C:\Users\AndriRakotomalala\Calibre Library\calibre\Les Echos (18)\Les Echos - calibre.epub", "", "Les EChos")
 
 # %%
 

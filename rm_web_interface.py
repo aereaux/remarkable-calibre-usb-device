@@ -3,10 +3,8 @@ import dataclasses
 import io
 import json
 import mimetypes
-import os
 import uuid
 from enum import Enum
-from urllib import parse as urllib_parse
 from urllib import request
 
 HEADERS__CONTENT_TYPE__JSON = {"Content-Type": "application/json"}
@@ -59,6 +57,7 @@ class Node:
         result = []
         for c in self.children:
             if c.document.Type == TypeOfDocument.CollectionType:
+                result.append(c.visible_name)
                 ls_children = list(map(lambda path: f"{c.visible_name}/{path}", c.ls_dir_recursive()))
                 result.extend(ls_children)
         return result
@@ -67,6 +66,7 @@ class Node:
         result = {}
         for c in self.children:
             if c.document.Type == TypeOfDocument.CollectionType:
+                result[c.visible_name] = c.document.ID
                 result.update({
                     f"{c.visible_name}/{name}": id
                     for name,id in c.ls_dir_recursive_dict().items()
@@ -181,9 +181,11 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
         "Connection": "keep-alive",
     }
 
-    if folder_id:
-        query_document(ip, folder_id)
+    # position pointer on folder
+    resp = query_document(ip, folder_id)
+    print(f"folder={resp}")
 
+    # upload
     with open(local_path, "rb") as fp:
         url = f"{base_url}/upload"
         form = MultiPartForm()
@@ -194,7 +196,6 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
             req.add_header(k, v)
         req.add_header("Content-Length", len(data))
         req.add_header("Content-Type", form.get_content_type())
-        print(req)
         # opener = request.build_opener(NonRaisingHTTPErrorProcessor)
         # with opener.open(req, **kwargs) as conn:
         with request.urlopen(req, **kwargs) as conn:
