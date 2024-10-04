@@ -27,8 +27,11 @@ def xochitl_restart(ip):
 
 @log_args_kwargs
 def test_connection(ip):
+    """
+    Test if ssh is working AND home is writable
+    """
     p = subprocess.Popen(
-        f'ssh {ssh_options} root@{ip} "/bin/true"',
+        f'ssh {ssh_options} root@{ip} "touch ~/calibre-remarkable-usb-device.touch"',
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

@@ -204,8 +204,6 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
 
 
 def check_connection(ip:str):
-    base_url = f"http://{ip}"
-
     try:
         query_document(ip, "", timeout=2)
         return True
