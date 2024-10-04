@@ -8,8 +8,10 @@ import subprocess
 import tempfile
 import pathlib
 import time
-from .helpers import log_args_kwargs
-
+try:
+    from .helpers import log_args_kwargs
+except:
+    from helpers import log_args_kwargs
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")

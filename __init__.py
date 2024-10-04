@@ -1,7 +1,7 @@
 from __future__ import annotations
 import time
 import pathlib
-
+import posixpath
 import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional
@@ -11,7 +11,7 @@ from calibre.ebooks.metadata.book.base import Metadata
 from calibre.devices.usbms.deviceconfig import DeviceConfig
 
 from .helpers import log_args_kwargs
-from . import rm_web_interface
+from . import rm_web_interface as rm_web_interface
 from . import rm_ssh
 
 if TYPE_CHECKING:
@@ -62,6 +62,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     MUST_READ_METADATA = False
     SUPPORTS_USE_AUTHOR_SORT = False
+    SAVE_TEMPLATE = "calibre/{author_sort}/{title} - {authors}"
 
     EXTRA_CUSTOMIZATION_MESSAGE = [
         # -----------
@@ -85,7 +86,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         "",
     ]
 
-    HELP_MESSAGE = _("Configure device")
+    HELP_MESSAGE = "Configure device"
 
     @classmethod
     def customization_help(cls, gui=False):
@@ -146,6 +147,18 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         settings = self.settings_obj()
         return rm_web_interface.query_tree(settings.IP, "").ls_recursive()
 
+    def _create_upload_path(self, path, mdata, fname):
+        from calibre.devices.utils import create_upload_path
+        from calibre.utils.filenames import ascii_filename as sanitize
+
+        return create_upload_path(mdata, fname, self.save_template, sanitize,
+                prefix_path="",
+                path_type=posixpath,
+                maxlen=30,
+                use_subdirs='/' in self.save_template(),
+                news_in_folder=self.NEWS_IN_FOLDER,
+                )
+        
     @log_args_kwargs
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
@@ -158,37 +171,34 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         print(f"existing_folders={existing_folders}")
         if not metadata:
             metadata = [None] * len(files_original)
-        for path, visible_name, m in zip(files_original, names, metadata):
-            rm_web_interface.upload_file(settings.IP, path, "", visible_name)
+        for upload_path, visible_name, m in zip(files_original, names, metadata):
+            rm_web_interface.upload_file(settings.IP, upload_path, "", visible_name)
             upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
 
         if has_ssh:
             needs_reboot = False
-            for file_id, m in zip(upload_ids, metadata):
-                author = m.author_sort or m.author if m else ""
+            for file_id,fn, m in zip(upload_ids, files_original, metadata):
+                upload_path = self._create_upload_path(fn,m,fn)
+                if upload_path:
+                    parts = upload_path.split("/")
+                    parts = parts[:-1]
+                    folder_id = ""
+                    parent_folder_id = ""
+                    for i in range(len(parts)):
+                        part_full = "/".join(parts[i:i+1])
+                        folder_id = existing_folders.get(part_full)
+                        print(f"folder_id={folder_id}")
+                        if not folder_id:
+                            part_name = parts[i]
+                            folder_id = rm_ssh.mkdir(settings.IP, part_name, parent_folder_id)
+                            existing_folders[part_full] = folder_id
+                            needs_reboot = True
+                            print(f"after mkdir folder_id={folder_id}")
+                        parent_folder_id = folder_id
 
-                folder_id = ""
-                if settings.BASE_REMOTE_FOLDER:
-                    folder_id = existing_folders.get(settings.BASE_REMOTE_FOLDER)
-                    print(f"folder_id={folder_id}")
-                    if not folder_id:
-                        folder_id = rm_ssh.mkdir(settings.IP, settings.BASE_REMOTE_FOLDER, "")
-                        existing_folders[settings.BASE_REMOTE_FOLDER] = folder_id
+                    if folder_id:
+                        rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
                         needs_reboot = True
-                        print(f"after mkdir folder_id={folder_id}")
-
-                if author:
-                    remote_folder = pathlib.Path(settings.BASE_REMOTE_FOLDER, author).as_posix()
-                    folder_id = existing_folders.get(remote_folder)
-                    print(f"author folder_id={folder_id}, author={author}")
-                    if not folder_id:
-                        folder_id = rm_ssh.mkdir(settings.IP, author, existing_folders[settings.BASE_REMOTE_FOLDER])
-                        existing_folders[remote_folder] = folder_id
-                        needs_reboot = True
-                        print(f"after author mkdir folder_id={folder_id}")
-
-                if folder_id:
-                    rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
 
             if needs_reboot:
                 rm_ssh.xochitl_restart(settings.IP)
