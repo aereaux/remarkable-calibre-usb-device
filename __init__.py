@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from calibre.devices.usbms.device import USBDevice
     from calibre.utils.config_base import OptionValues
 
+PLUGIN_NAME = "Remarkable Device Plugin for Calibre"
 print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
 device = None
 
@@ -45,8 +46,8 @@ class RemarkableDeviceDescription:
 
 
 class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
-    name = "Remarkable Device Plugin for Calibre"
-    description = "Send files to Remarkable"
+    name = PLUGIN_NAME
+    description = "Send epub and pdf files to Remarkable"
     author = "Andri Rakotomalala"
     supported_platforms = ["linux", "windows", "osx"]
     version = (0, 1, 1)  # The version number of this plugin
@@ -127,11 +128,11 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             # TODO: check for USBDevice.vendor_id
             if device is None and rm_web_interface.check_connection(settings.IP):
                 device = RemarkableDeviceDescription(settings.IP)
-                print(f"detected new {device}")
-            print(f"returning device={device}")
+                print(f"detected new {device=}")
+            print(f"returning {device=}")
             return device
         except Exception as e:
-            print(f"No device detected {e}")
+            print(f"No device detected {e=}")
             device = None
             return None
 
@@ -166,16 +167,17 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         settings = self.settings_obj()
 
         upload_ids = []
-        has_ssh = rm_ssh.test_connection(settings.IP)
-        existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
-        print(f"existing_folders={existing_folders}")
         if not metadata:
             metadata = [None] * len(files_original)
         for upload_path, visible_name, m in zip(files_original, names, metadata):
             rm_web_interface.upload_file(settings.IP, upload_path, "", visible_name)
             upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
 
+        has_ssh = rm_ssh.test_connection(settings.IP)
+        print(f"{has_ssh=}")
         if has_ssh:
+            existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
+            print(f"{existing_folders=}")
             needs_reboot = False
             for file_id,fn, m in zip(upload_ids, files_original, metadata):
                 upload_path = self._create_upload_path(fn,m,fn)
@@ -187,13 +189,13 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                     for i in range(len(parts)):
                         part_full = "/".join(parts[i:i+1])
                         folder_id = existing_folders.get(part_full)
-                        print(f"folder_id={folder_id}")
+                        print(f"{folder_id=}")
                         if not folder_id:
                             part_name = parts[i]
                             folder_id = rm_ssh.mkdir(settings.IP, part_name, parent_folder_id)
                             existing_folders[part_full] = folder_id
                             needs_reboot = True
-                            print(f"after mkdir folder_id={folder_id}")
+                            print(f"after mkdir {folder_id=}")
                         parent_folder_id = folder_id
 
                     if folder_id:
@@ -205,7 +207,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
-        print(f"opening {connected_device}")
+        print(f"opening {connected_device=}")
 
     @log_args_kwargs
     def is_usb_connected(self, devices_on_system, debug=False, only_presence=False):

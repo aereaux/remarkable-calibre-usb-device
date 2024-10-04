@@ -28,44 +28,44 @@ BASE_REMOTE_FOLDER = "calibre_uploads"
 IP = "10.11.99.1"
 
 
-    def upload_books(
-        files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
-    ):
-        upload_ids = []
-        has_ssh = rm_ssh.test_connection(IP)
-        existing_folders = rm_web_interface.query_tree(IP, "").ls_dir_recursive_dict() if has_ssh else {}
-        print(f"existing_folders={existing_folders}")
-        if not metadata:
-            metadata = [None] * len(files_original)
-        for upload_path, visible_name, m in zip(files_original, names, metadata):
-            rm_web_interface.upload_file(IP, upload_path, "", visible_name)
-            upload_ids.append(rm_ssh.get_latest_upload_id(IP))
+def upload_books(
+    files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
+):
+    upload_ids = []
+    has_ssh = rm_ssh.test_connection(IP)
+    existing_folders = rm_web_interface.query_tree(IP, "").ls_dir_recursive_dict() if has_ssh else {}
+    print(f"existing_folders={existing_folders}")
+    if not metadata:
+        metadata = [None] * len(files_original)
+    for upload_path, visible_name, m in zip(files_original, names, metadata):
+        rm_web_interface.upload_file(IP, upload_path, "", visible_name)
+        upload_ids.append(rm_ssh.get_latest_upload_id(IP))
 
-        if has_ssh:
-            needs_reboot = False
-            for file_id,fn, m in zip(upload_ids, files_original, metadata):
-                upload_path = "something/test/ok"
-                if upload_path:
-                    parts = upload_path.split("/")
-                    folder_id = ""
-                    parent_folder_id = ""
-                    for i in range(len(parts)):
-                        part_full = "/".join(parts[i:i+1])
-                        folder_id = existing_folders.get(part_full)
-                        print(f"folder_id={folder_id}")
-                        if not folder_id:
-                            part_name = parts[i]
-                            folder_id = rm_ssh.mkdir(IP, part_name, parent_folder_id)
-                            existing_folders[part_full] = folder_id
-                            needs_reboot = True
-                            print(f"after mkdir folder_id={folder_id}")
-                        parent_folder_id = folder_id
+    if has_ssh:
+        needs_reboot = False
+        for file_id,fn, m in zip(upload_ids, files_original, metadata):
+            upload_path = "something/test/ok"
+            if upload_path:
+                parts = upload_path.split("/")
+                folder_id = ""
+                parent_folder_id = ""
+                for i in range(len(parts)):
+                    part_full = "/".join(parts[i:i+1])
+                    folder_id = existing_folders.get(part_full)
+                    print(f"{folder_id=}")
+                    if not folder_id:
+                        part_name = parts[i]
+                        folder_id = rm_ssh.mkdir(IP, part_name, parent_folder_id)
+                        existing_folders[part_full] = folder_id
+                        needs_reboot = True
+                        print(f"after mkdir {folder_id=}")
+                    parent_folder_id = folder_id
 
-                    if folder_id:
-                        rm_ssh.sed(IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
+                if folder_id:
+                    rm_ssh.sed(IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
 
-            if needs_reboot:
-                rm_ssh.xochitl_restart(IP)
+        if needs_reboot:
+            rm_ssh.xochitl_restart(IP)
 
 upload_books(
 [r"C:\Users\AndriRakotomalala\Calibre Library\calibre\Les Echos (18)\Les Echos - calibre.epub"],
