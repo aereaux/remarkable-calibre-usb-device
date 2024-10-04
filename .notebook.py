@@ -32,10 +32,13 @@ def upload_books(files_original, names, on_card=None, end_session=True, metadata
     print(f"existing_folders={existing_folders}")
     if not metadata:
         metadata = [None] * len(files_original)
+
+    # upload
     for path, visible_name, m in zip(files_original, names, metadata):
         rm_web_interface.upload_file(IP, path, "", visible_name)
         upload_ids.append(rm_ssh.get_latest_upload_id(IP))
 
+    # create folders, move files into their respective folders, reboot
     if has_ssh:
         needs_reboot = False
         for file_id, m in zip(upload_ids, metadata):
