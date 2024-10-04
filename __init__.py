@@ -23,11 +23,6 @@ print("----------------------------------- REMARKABLE PLUGIN web interface -----
 device = None
 
 
-def dummy_set_progress_reporter(*args, **kwargs):
-    print("dummy_set_progress_reporter")
-    return 100
-
-
 @dataclass
 class RemarkableSettings:
     BASE_REMOTE_FOLDER: str
@@ -46,6 +41,7 @@ class RemarkableDeviceDescription:
 
 
 class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
+    progress = 0
     name = PLUGIN_NAME
     description = "Send epub and pdf files to Remarkable"
     author = "Andri Rakotomalala"
@@ -67,19 +63,17 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     EXTRA_CUSTOMIZATION_MESSAGE = [
         # -----------
-        "Remarkable folder destination:::"
-        "<p>Upload to this folder on the Remarkable</p>",
+        "Remarkable folder destination:::" "<p>Upload to this folder on the Remarkable</p>",
         # -----------
         "IP address:::"
         "<p>"
-            "Use this option if you want to force the driver to listen on a "
-            "particular IP address. The driver will listen only on the "
-            "entered address, and this address will be the one advertised "
-            "over mDNS (BonJour)."
+        "Use this option if you want to force the driver to listen on a "
+        "particular IP address. The driver will listen only on the "
+        "entered address, and this address will be the one advertised "
+        "over mDNS (BonJour)."
         "</p>",
         # -----------
-        "SSH password (optional):::"
-        "<p>Required for folders support</p>",
+        "SSH password (optional):::" "<p>Required for folders support</p>",
     ]
     EXTRA_CUSTOMIZATION_DEFAULT = [
         "",
@@ -152,26 +146,34 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         from calibre.devices.utils import create_upload_path
         from calibre.utils.filenames import ascii_filename as sanitize
 
-        return create_upload_path(mdata, fname, self.save_template, sanitize,
-                prefix_path="",
-                path_type=posixpath,
-                maxlen=30,
-                use_subdirs='/' in self.save_template(),
-                news_in_folder=self.NEWS_IN_FOLDER,
-                )
-        
+        return create_upload_path(
+            mdata,
+            fname,
+            self.save_template,
+            sanitize,
+            prefix_path="",
+            path_type=posixpath,
+            maxlen=30,
+            use_subdirs="/" in self.save_template(),
+            news_in_folder=self.NEWS_IN_FOLDER,
+        )
+
     @log_args_kwargs
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
     ):
+        self.progress = 0
         settings = self.settings_obj()
 
         upload_ids = []
         if not metadata:
             metadata = [None] * len(files_original)
+        step = 60 / len(files_original)
         for upload_path, visible_name, m in zip(files_original, names, metadata):
             rm_web_interface.upload_file(settings.IP, upload_path, "", visible_name)
             upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
+            self.progress += step
+        self.progress = 60
 
         has_ssh = rm_ssh.test_connection(settings.IP)
         print(f"{has_ssh=}")
@@ -179,15 +181,15 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
             print(f"{existing_folders=}")
             needs_reboot = False
-            for file_id,fn, m in zip(upload_ids, files_original, metadata):
-                upload_path = self._create_upload_path(fn,m,fn)
+            for file_id, fn, m in zip(upload_ids, files_original, metadata):
+                upload_path = self._create_upload_path(fn, m, fn)
                 if upload_path:
                     parts = upload_path.split("/")
                     parts = parts[:-1]
                     folder_id = ""
                     parent_folder_id = ""
                     for i in range(len(parts)):
-                        part_full = "/".join(parts[i:i+1])
+                        part_full = "/".join(parts[i : i + 1])
                         folder_id = existing_folders.get(part_full)
                         print(f"{folder_id=}")
                         if not folder_id:
@@ -202,8 +204,10 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
                         needs_reboot = True
 
+            self.progress = 80
             if needs_reboot:
                 rm_ssh.xochitl_restart(settings.IP)
+        self.progress = 100
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
@@ -267,6 +271,9 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def set_progress_reporter(self, report_progress):
+        def dummy_set_progress_reporter(*args, **kwargs):
+            return self.progress
+
         return dummy_set_progress_reporter
 
     @log_args_kwargs
