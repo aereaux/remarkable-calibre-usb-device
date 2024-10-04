@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
 device = None
-BASE_REMOTE_FOLDER = "calibre"
+BASE_REMOTE_FOLDER = "calibre_uploads"
 IP = "10.11.99.1"
 
 def dummy_set_progress_reporter(*args, **kwargs):
@@ -84,17 +84,22 @@ class RemarkableUsbDevice(DevicePlugin):
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
     ):
-        needs_reboot = False
+        upload_ids = []
         has_ssh = rm_ssh.test_connection(IP)
         existing_folders = rm_web_interface.query_tree(IP, "").ls_dir_recursive_dict() if has_ssh else {}
         print(f"existing_folders={existing_folders}")
         if not metadata:
             metadata = [None] * len(files_original)
         for path, visible_name, m in zip(files_original, names, metadata):
-            author = m.author_sort or m.author if m else ""
+            rm_web_interface.upload_file(IP, path, "", visible_name)
+            upload_ids.append(rm_ssh.get_latest_upload_id(IP))
+            
+        if has_ssh:
+            needs_reboot = False
+            for file_id, m in zip(upload_ids, metadata):
+                author = m.author_sort or m.author if m else ""
 
-            folder_id = ""
-            if has_ssh:
+                folder_id = ""
                 if BASE_REMOTE_FOLDER:
                     folder_id = existing_folders.get(BASE_REMOTE_FOLDER)
                     print(f"folder_id={folder_id}")
@@ -113,11 +118,12 @@ class RemarkableUsbDevice(DevicePlugin):
                         existing_folders[remote_folder] = folder_id
                         needs_reboot=True
                         print(f"after author mkdir folder_id={folder_id}")
+                
+                if folder_id:
+                    rm_ssh.sed(IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
 
             if needs_reboot:
                 rm_ssh.xochitl_restart(IP)
-                time.sleep(6)
-            rm_web_interface.upload_file(IP, path, folder_id, visible_name)
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
