@@ -9,6 +9,12 @@
             "args": [
                 "push       something"
             ]
+        },
+        {
+            "name": "Python Debugger: Attach using Process Id",
+            "type": "debugpy",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
         }
     ]
 }

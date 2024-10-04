@@ -8,24 +8,30 @@ from typing import TYPE_CHECKING, List, Optional
 
 from calibre.devices.interface import DevicePlugin
 from calibre.ebooks.metadata.book.base import Metadata
+from calibre.devices.usbms.deviceconfig import DeviceConfig
 
-# from . import rm_web_interface
 from .helpers import log_args_kwargs
-from . import rm_web_interface as rm_web_interface
+from . import rm_web_interface
 from . import rm_ssh
 
 if TYPE_CHECKING:
     from calibre.devices.usbms.device import USBDevice
+    from calibre.utils.config_base import OptionValues
 
 print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
 device = None
-BASE_REMOTE_FOLDER = "calibre_uploads"
-IP = "10.11.99.1"
+
 
 def dummy_set_progress_reporter(*args, **kwargs):
     print("dummy_set_progress_reporter")
     return 100
 
+
+@dataclass
+class RemarkableSettings:
+    BASE_REMOTE_FOLDER: str
+    IP: str
+    SSH_PASSWORD: str
 
 
 @dataclass
@@ -38,7 +44,7 @@ class RemarkableDeviceDescription:
         return f"Remarkable on http://{self.ip}, rid={self.random_id}"
 
 
-class RemarkableUsbDevice(DevicePlugin):
+class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     name = "Remarkable Device Plugin for Calibre"
     description = "Send files to Remarkable"
     author = "Andri Rakotomalala"
@@ -49,6 +55,63 @@ class RemarkableUsbDevice(DevicePlugin):
     FORMATS = ["epub", "pdf"]
     CAN_SET_METADATA = []
     MANAGES_DEVICE_PRESENCE = True
+    SUPPORTS_SUB_DIRS = True
+    HIDE_FORMATS_CONFIG_BOX = True
+    NEWS_IN_FOLDER = True
+    USER_CAN_ADD_NEW_FORMATS = False
+
+    MUST_READ_METADATA = False
+    SUPPORTS_USE_AUTHOR_SORT = False
+
+    EXTRA_CUSTOMIZATION_MESSAGE = [
+        # -----------
+        "Remarkable folder destination:::"
+        "<p>Upload to this folder on the Remarkable</p>",
+        # -----------
+        "IP address:::"
+        "<p>"
+            "Use this option if you want to force the driver to listen on a "
+            "particular IP address. The driver will listen only on the "
+            "entered address, and this address will be the one advertised "
+            "over mDNS (BonJour)."
+        "</p>",
+        # -----------
+        "SSH password (optional):::"
+        "<p>Required for folders support</p>",
+    ]
+    EXTRA_CUSTOMIZATION_DEFAULT = [
+        "",
+        "10.11.99.1",
+        "",
+    ]
+
+    HELP_MESSAGE = _("Configure device")
+
+    @classmethod
+    def customization_help(cls, gui=False):
+        return cls.HELP_MESSAGE
+
+    def is_customizable(self):
+        return True
+
+    def config_widget(self):
+        from calibre.gui2.device_drivers.configwidget import ConfigWidget
+
+        cw = ConfigWidget(
+            self.settings(),
+            self.FORMATS,
+            self.SUPPORTS_SUB_DIRS,
+            self.MUST_READ_METADATA,
+            self.SUPPORTS_USE_AUTHOR_SORT,
+            self.EXTRA_CUSTOMIZATION_MESSAGE,
+            self,
+        )
+        return cw
+
+    @classmethod
+    def settings_obj(cls):
+        settings = cls.settings()
+        return RemarkableSettings(*settings.extra_customization)
 
     @log_args_kwargs
     def startup(self):
@@ -57,10 +120,12 @@ class RemarkableUsbDevice(DevicePlugin):
     @log_args_kwargs
     def detect_managed_devices(self, devices_on_system: List[USBDevice], force_refresh=False):
         global device
+        settings = self.settings_obj()
+
         try:
             # TODO: check for USBDevice.vendor_id
-            if device is None and rm_web_interface.check_connection(IP):
-                device = RemarkableDeviceDescription(IP)
+            if device is None and rm_web_interface.check_connection(settings.IP):
+                device = RemarkableDeviceDescription(settings.IP)
                 print(f"detected new {device}")
             print(f"returning device={device}")
             return device
@@ -78,52 +143,55 @@ class RemarkableUsbDevice(DevicePlugin):
 
     @log_args_kwargs
     def books(self, oncard=None, end_session=True):
-        return rm_web_interface.query_tree(IP, "").ls_recursive()
+        settings = self.settings_obj()
+        return rm_web_interface.query_tree(settings.IP, "").ls_recursive()
 
     @log_args_kwargs
     def upload_books(
         self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
     ):
+        settings = self.settings_obj()
+
         upload_ids = []
-        has_ssh = rm_ssh.test_connection(IP)
-        existing_folders = rm_web_interface.query_tree(IP, "").ls_dir_recursive_dict() if has_ssh else {}
+        has_ssh = rm_ssh.test_connection(settings.IP)
+        existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
         print(f"existing_folders={existing_folders}")
         if not metadata:
             metadata = [None] * len(files_original)
         for path, visible_name, m in zip(files_original, names, metadata):
-            rm_web_interface.upload_file(IP, path, "", visible_name)
-            upload_ids.append(rm_ssh.get_latest_upload_id(IP))
-            
+            rm_web_interface.upload_file(settings.IP, path, "", visible_name)
+            upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
+
         if has_ssh:
             needs_reboot = False
             for file_id, m in zip(upload_ids, metadata):
                 author = m.author_sort or m.author if m else ""
 
                 folder_id = ""
-                if BASE_REMOTE_FOLDER:
-                    folder_id = existing_folders.get(BASE_REMOTE_FOLDER)
+                if settings.BASE_REMOTE_FOLDER:
+                    folder_id = existing_folders.get(settings.BASE_REMOTE_FOLDER)
                     print(f"folder_id={folder_id}")
                     if not folder_id:
-                        folder_id = rm_ssh.mkdir(IP, BASE_REMOTE_FOLDER, "")
-                        existing_folders[BASE_REMOTE_FOLDER] = folder_id
-                        needs_reboot=True
+                        folder_id = rm_ssh.mkdir(settings.IP, settings.BASE_REMOTE_FOLDER, "")
+                        existing_folders[settings.BASE_REMOTE_FOLDER] = folder_id
+                        needs_reboot = True
                         print(f"after mkdir folder_id={folder_id}")
 
                 if author:
-                    remote_folder = pathlib.Path(BASE_REMOTE_FOLDER, author).as_posix()
+                    remote_folder = pathlib.Path(settings.BASE_REMOTE_FOLDER, author).as_posix()
                     folder_id = existing_folders.get(remote_folder)
                     print(f"author folder_id={folder_id}, author={author}")
                     if not folder_id:
-                        folder_id = rm_ssh.mkdir(IP, author, existing_folders[BASE_REMOTE_FOLDER])
+                        folder_id = rm_ssh.mkdir(settings.IP, author, existing_folders[settings.BASE_REMOTE_FOLDER])
                         existing_folders[remote_folder] = folder_id
-                        needs_reboot=True
+                        needs_reboot = True
                         print(f"after author mkdir folder_id={folder_id}")
-                
+
                 if folder_id:
-                    rm_ssh.sed(IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
+                    rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
 
             if needs_reboot:
-                rm_ssh.xochitl_restart(IP)
+                rm_ssh.xochitl_restart(settings.IP)
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
@@ -281,16 +349,3 @@ class RemarkableUsbDevice(DevicePlugin):
     @log_args_kwargs
     def add_books_to_metadata(cls, locations, metadata, booklists):
         pass
-
-    @classmethod
-    def settings(cls):
-        """
-        Should return an opts object. The opts object should have at least one
-        attribute `format_map` which is an ordered list of formats for the
-        device.
-        """
-        return OptsSettings()
-
-
-class OptsSettings:
-    format_map = ["epub", "pdf"]
