@@ -3,6 +3,14 @@
     "tasks": [
         {
             "type": "shell",
+            "command": "ssh",
+            "args": [
+                "root@10.11.99.1"
+            ],
+            "label": "ssh",
+        },
+        {
+            "type": "shell",
             "command": "C:\\Program Files\\Calibre2\\calibre-debug.exe",
             "args": [
                 "-g"
