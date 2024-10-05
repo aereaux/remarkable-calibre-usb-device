@@ -1,22 +1,20 @@
 from __future__ import annotations
-import time
-import pathlib
+
 import posixpath
 import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional
 
-from calibre.devices.interface import DevicePlugin
-from calibre.ebooks.metadata.book.base import Metadata
-from calibre.devices.usbms.deviceconfig import DeviceConfig
+from calibre.devices.interface import DevicePlugin  # type: ignore
+from calibre.devices.usbms.deviceconfig import DeviceConfig  # type: ignore
 
-from .helpers import log_args_kwargs
-from . import rm_web_interface as rm_web_interface
 from . import rm_ssh
+from . import rm_web_interface as rm_web_interface
+from .log_helper import log_args_kwargs
 
 if TYPE_CHECKING:
-    from calibre.devices.usbms.device import USBDevice
-    from calibre.utils.config_base import OptionValues
+    from calibre.devices.usbms.device import USBDevice  # type: ignore
+    from calibre.ebooks.metadata.book.base import Metadata  # type: ignore
 
 PLUGIN_NAME = "Remarkable Device Plugin for Calibre"
 print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
@@ -25,7 +23,6 @@ device = None
 
 @dataclass
 class RemarkableSettings:
-    BASE_REMOTE_FOLDER: str
     IP: str
     SSH_PASSWORD: str
 
@@ -41,7 +38,7 @@ class RemarkableDeviceDescription:
 
 
 class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
-    progress = 0
+    progress = 0.0
     name = PLUGIN_NAME
     description = "Send epub and pdf files to Remarkable"
     author = "Andri Rakotomalala"
@@ -50,7 +47,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     minimum_calibre_version = (0, 7, 53)
 
     FORMATS = ["epub", "pdf"]
-    CAN_SET_METADATA = []
+    CAN_SET_METADATA: list[str] = []
     MANAGES_DEVICE_PRESENCE = True
     SUPPORTS_SUB_DIRS = True
     HIDE_FORMATS_CONFIG_BOX = True
@@ -59,11 +56,9 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     MUST_READ_METADATA = False
     SUPPORTS_USE_AUTHOR_SORT = False
-    SAVE_TEMPLATE = "calibre/{author_sort}/{title} - {authors}"
+    SAVE_TEMPLATE = "calibre/{author_sort}/{title} - {authors}"  # type: ignore
 
-    EXTRA_CUSTOMIZATION_MESSAGE = [
-        # -----------
-        "Remarkable folder destination:::" "<p>Upload to this folder on the Remarkable</p>",
+    EXTRA_CUSTOMIZATION_MESSAGE = [  # type: ignore
         # -----------
         "IP address:::"
         "<p>"
@@ -75,23 +70,15 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         # -----------
         "SSH password (optional):::" "<p>Required for folders support</p>",
     ]
-    EXTRA_CUSTOMIZATION_DEFAULT = [
-        "",
+    EXTRA_CUSTOMIZATION_DEFAULT = [  # type: ignore
         "10.11.99.1",
         "",
     ]
 
-    HELP_MESSAGE = "Configure device"
-
-    @classmethod
-    def customization_help(cls, gui=False):
-        return cls.HELP_MESSAGE
-
-    def is_customizable(self):
-        return True
-
     def config_widget(self):
-        from calibre.gui2.device_drivers.configwidget import ConfigWidget
+        from calibre.gui2.device_drivers.configwidget import (  # type: ignore
+            ConfigWidget,
+        )
 
         cw = ConfigWidget(
             self.settings(),
@@ -143,8 +130,8 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         return rm_web_interface.query_tree(settings.IP, "").ls_recursive()
 
     def _create_upload_path(self, path, mdata, fname):
-        from calibre.devices.utils import create_upload_path
-        from calibre.utils.filenames import ascii_filename as sanitize
+        from calibre.devices.utils import create_upload_path  # type: ignore
+        from calibre.utils.filenames import ascii_filename as sanitize  # type: ignore
 
         return create_upload_path(
             mdata,
@@ -160,9 +147,9 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def upload_books(
-        self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Metadata]] = None
+        self, files_original, names, on_card=None, end_session=True, metadata: Optional[list[Optional[Metadata]]] = None
     ):
-        self.progress = 0
+        self.progress = 0.0
         settings = self.settings_obj()
 
         upload_ids = []
@@ -173,7 +160,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             rm_web_interface.upload_file(settings.IP, upload_path, "", visible_name)
             upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
             self.progress += step
-        self.progress = 60
+        self.progress = 60.0
 
         has_ssh = rm_ssh.test_connection(settings.IP)
         print(f"{has_ssh=}")
@@ -204,10 +191,10 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
                         needs_reboot = True
 
-            self.progress = 80
+            self.progress = 80.0
             if needs_reboot:
                 rm_ssh.xochitl_restart(settings.IP)
-        self.progress = 100
+        self.progress = 100.0
 
     @log_args_kwargs
     def open(self, connected_device, library_uuid):
@@ -272,7 +259,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     @log_args_kwargs
     def set_progress_reporter(self, report_progress):
         def dummy_set_progress_reporter(*args, **kwargs):
-            return self.progress
+            return int(self.progress)
 
         return dummy_set_progress_reporter
 

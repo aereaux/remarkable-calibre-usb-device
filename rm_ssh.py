@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 
-import uuid
 import os
-import time
-import uuid
+import pathlib
 import subprocess
 import tempfile
-import pathlib
 import time
-try:
-    from .helpers import log_args_kwargs
-except:
-    from helpers import log_args_kwargs
+import uuid
+
+from .log_helper import log_args_kwargs  # type: ignore
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")
@@ -28,18 +24,36 @@ def xochitl_restart(ip):
 
 
 @log_args_kwargs
-def test_connection(ip):
+def _touch_fs(ip):
     """
     Test if ssh is working AND home is writable
     """
     p = subprocess.Popen(
-        f'ssh {ssh_options} root@{ip} "touch ~/calibre-remarkable-usb-device.touch"',
+        f'ssh {ssh_options} root@{ip} "touch ~/calibre_remarkable_usb_device.touch"',
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     p.wait()
     return p.returncode == 0
+
+
+@log_args_kwargs
+def test_connection(ip):
+    """
+    Test if ssh is working AND home is writable
+    """
+    rw_success = _touch_fs(ip)
+    if not rw_success:
+        p = subprocess.Popen(
+            f'ssh {ssh_options} root@{ip} "mount -o remount,rw /"',
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        p.wait()
+        return p.returncode == 0
+    return True
 
 
 @log_args_kwargs

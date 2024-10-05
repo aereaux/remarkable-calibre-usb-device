@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "calibre-remarkable-usb-device"
+name = "calibre_remarkable_usb_device"
 version = "0.1.0"
 description = ""
 authors = ["Andri Rakotomalala <andriniaina@gmail.com>"]
@@ -22,3 +22,6 @@ line-length = 120
 
 [tool.ruff]
 line-length = 120
+
+[tool.mypy]
+follow_imports = "silent"

@@ -33,15 +33,19 @@ class Document:
         return Document(
             d["ID"],
             d["Parent"],
-            d.get("Type"),
-            d.get("VissibleName", ""),  # .encode("ISO-8859-1").decode("utf-8"),
-            d.get("fileType"),
+            str(d.get("Type")),
+            str(d.get("fileType")),
+            str(d.get("VissibleName", "")),
         )
 
 
 @dataclasses.dataclass
 class Node:
-    children: list["ChildNode"] = dataclasses.field(default_factory=list)
+    children: list["ChildNode"]
+
+    @classmethod
+    def new_empty(cls):
+        return Node([])
 
     def ls_recursive(self: "Node"):
         result = []
@@ -52,7 +56,7 @@ class Node:
             else:
                 result.append(c.visible_name)
         return result
-    
+
     def ls_dir_recursive(self: "Node"):
         result = []
         for c in self.children:
@@ -67,16 +71,13 @@ class Node:
         for c in self.children:
             if c.document.Type == TypeOfDocument.CollectionType:
                 result[c.visible_name] = c.document.ID
-                result.update({
-                    f"{c.visible_name}/{name}": id
-                    for name,id in c.ls_dir_recursive_dict().items()
-                })
+                result.update({f"{c.visible_name}/{name}": id for name, id in c.ls_dir_recursive_dict().items()})
         return result
 
 
 @dataclasses.dataclass
 class ChildNode(Node):
-    document: Document = None
+    document: Document
 
     @property
     def visible_name(self):
@@ -117,7 +118,9 @@ class MultiPartForm:
     def _attached_file(name, filename):
         return (
             # ('Content-Disposition: file; name="{}"; filename="{}"\r\n')
-            ('Content-Disposition: form-data; name="{}"; filename="{}"\r\n').format(name, filename).encode("utf-8")
+            ('Content-Disposition: form-data; name="{}"; filename="{}"\r\n')
+            .format(name, filename)
+            .encode("utf-8")
         )
 
     @staticmethod
@@ -203,7 +206,7 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
             return json.loads(conn.read())
 
 
-def check_connection(ip:str):
+def check_connection(ip: str):
     try:
         query_document(ip, "", timeout=2)
         return True
@@ -214,22 +217,14 @@ def check_connection(ip:str):
 
 def query_tree(ip, path_id):
     document_list_jsond = query_document(ip, path_id)
-    root = Node()
+    root = Node.new_empty()
     id_to_obj = {path_id: root}
     documents: list[Document] = list(sorted((Document.parse(r) for r in document_list_jsond), key=lambda d: d.Parent))
     for d in documents:
         id_to_obj[d.ID] = d
-        node = ChildNode(document=d)
+        node = ChildNode([], document=d)
         id_to_obj[d.Parent].children.append(node)
         if d.Type == TypeOfDocument.CollectionType:
             node.children.extend(query_tree(ip, d.ID).children)
 
     return root
-
-
-
-
-# %%
-def upload(files: list[str], names: list[str]):
-    for f, n in zip(files, names):
-        upload_file(f, n)
