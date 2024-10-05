@@ -34,8 +34,8 @@ class Document:
             d["ID"],
             d["Parent"],
             str(d.get("Type")),
-            str(d.get("fileType")),
             str(d.get("VissibleName", "")),
+            str(d.get("fileType")),
         )
 
 
@@ -225,6 +225,7 @@ def query_tree(ip, path_id):
         node = ChildNode([], document=d)
         id_to_obj[d.Parent].children.append(node)
         if d.Type == TypeOfDocument.CollectionType:
-            node.children.extend(query_tree(ip, d.ID).children)
+            cc = query_tree(ip, d.ID).children
+            node.children.extend(cc)
 
     return root
