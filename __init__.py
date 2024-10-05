@@ -136,11 +136,11 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         return create_upload_path(
             mdata,
             fname,
-            self.save_template,
+            self.save_template(),
             sanitize,
             prefix_path="",
             path_type=posixpath,
-            maxlen=30,
+            maxlen=200,
             use_subdirs="/" in self.save_template(),
             news_in_folder=self.NEWS_IN_FOLDER,
         )

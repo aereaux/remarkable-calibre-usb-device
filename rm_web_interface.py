@@ -186,7 +186,7 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
 
     # position pointer on folder
     resp = query_document(ip, folder_id)
-    print(f"folder={resp}")
+    print(f"{resp=}")
 
     # upload
     with open(local_path, "rb") as fp:

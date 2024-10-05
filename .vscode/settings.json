@@ -1,6 +1,7 @@
 {
     "python.analysis.extraPaths": [
-        "~/dev/calibre/src"
+        "~/dev/calibre/src",
+        "c:/dev/calibre/src"
     ],
     "files.exclude": {
         "**/.git": true,
