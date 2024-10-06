@@ -24,7 +24,7 @@ def xochitl_restart(ip):
 
 
 @log_args_kwargs
-def _touch_fs(ip):
+def _touch_home_fs(ip):
     """
     Test if ssh is working AND home is writable
     """
@@ -43,17 +43,17 @@ def test_connection(ip):
     """
     Test if ssh is working AND home is writable
     """
-    rw_success = _touch_fs(ip)
-    if not rw_success:
-        p = subprocess.Popen(
-            f'ssh {ssh_options} root@{ip} "mount -o remount,rw /"',
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        p.wait()
-        return p.returncode == 0
-    return True
+    rw_success = _touch_home_fs(ip)
+    # if not rw_success:
+    #    p = subprocess.Popen(
+    #        f'ssh {ssh_options} root@{ip} "mount -o remount,rw /"',
+    #        shell=True,
+    #        stdout=subprocess.PIPE,
+    #        stderr=subprocess.PIPE,
+    #    )
+    #    p.wait()
+    #    rw_success = p.returncode == 0
+    return rw_success
 
 
 @log_args_kwargs
