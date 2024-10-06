@@ -43,7 +43,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     description = "Send epub and pdf files to Remarkable"
     author = "Andri Rakotomalala"
     supported_platforms = ["linux", "windows", "osx"]
-    version = (0, 1, 1)  # The version number of this plugin
+    version = (0, 1, 2)  # The version number of this plugin
     minimum_calibre_version = (0, 7, 53)
 
     FORMATS = ["epub", "pdf"]
@@ -176,7 +176,8 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                     folder_id = ""
                     parent_folder_id = ""
                     for i in range(len(parts)):
-                        part_full = "/".join(parts[i : i + 1])
+                        part_full = "/".join(parts[ : i + 1])
+                        print(f"Looking for {part_full=}")
                         folder_id = existing_folders.get(part_full)
                         print(f"{folder_id=}")
                         if not folder_id:
