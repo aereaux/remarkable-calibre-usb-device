@@ -155,46 +155,47 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         upload_ids = []
         if not metadata:
             metadata = [None] * len(files_original)
-        step = 60 / len(files_original)
-        for upload_path, visible_name, m in zip(files_original, names, metadata):
-            rm_web_interface.upload_file(settings.IP, upload_path, "", visible_name)
-            upload_ids.append(rm_ssh.get_latest_upload_id(settings.IP))
-            self.progress += step
-        self.progress = 60.0
-
+        step = 100 / len(files_original)
         has_ssh = rm_ssh.test_connection(settings.IP)
-        print(f"{has_ssh=}")
-        if has_ssh:
-            existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
-            print(f"{existing_folders=}")
-            needs_reboot = False
-            for file_id, fn, m in zip(upload_ids, files_original, metadata):
-                upload_path = self._create_upload_path(fn, m, fn)
+        existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
+        needs_reboot = False
+        for local_path, visible_name, m in zip(files_original, names, metadata):
+            folder_id = ""
+            folder_id_final = ""
+            is_new_folder = False
+            if has_ssh:
+                upload_path = self._create_upload_path(local_path, m, local_path)
                 if upload_path:
                     parts = upload_path.split("/")
                     parts = parts[:-1]
-                    folder_id = ""
                     parent_folder_id = ""
                     for i in range(len(parts)):
-                        part_full = "/".join(parts[ : i + 1])
+                        part_full = "/".join(parts[: i + 1])
                         print(f"Looking for {part_full=}")
-                        folder_id = existing_folders.get(part_full)
-                        print(f"{folder_id=}")
-                        if not folder_id:
+                        folder_id_final = existing_folders.get(part_full)
+                        print(f"{folder_id_final=}")
+                        if not folder_id_final:
                             part_name = parts[i]
-                            folder_id = rm_ssh.mkdir(settings.IP, part_name, parent_folder_id)
-                            existing_folders[part_full] = folder_id
+                            folder_id_final = rm_ssh.mkdir(settings.IP, part_name, parent_folder_id)
+                            existing_folders[part_full] = folder_id_final
                             needs_reboot = True
-                            print(f"after mkdir {folder_id=}")
-                        parent_folder_id = folder_id
+                            print(f"after mkdir {folder_id_final=}")
+                            is_new_folder = True
+                        parent_folder_id = folder_id_final
 
-                    if folder_id:
-                        rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id}"')
-                        needs_reboot = True
+            if is_new_folder:
+                rm_web_interface.upload_file(settings.IP, local_path, "", visible_name)
+                print(f"{folder_id=} != {folder_id_final=}")
+                file_id = rm_ssh.get_latest_upload_id(settings.IP)
+                rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
+                needs_reboot = True
+            else:
+                rm_web_interface.upload_file(settings.IP, local_path, folder_id_final, visible_name)
 
-            self.progress = 80.0
-            if needs_reboot:
-                rm_ssh.xochitl_restart(settings.IP)
+            self.progress += step
+
+        if needs_reboot:
+            rm_ssh.xochitl_restart(settings.IP)
         self.progress = 100.0
 
     @log_args_kwargs
