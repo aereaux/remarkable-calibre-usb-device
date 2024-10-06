@@ -152,7 +152,6 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         self.progress = 0.0
         settings = self.settings_obj()
 
-        upload_ids = []
         if not metadata:
             metadata = [None] * len(files_original)
         step = 100 / len(files_original)
