@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, List, Optional
 from calibre.devices.interface import DevicePlugin  # type: ignore
 from calibre.devices.usbms.deviceconfig import DeviceConfig  # type: ignore
 
+from .rm_settings import RemarkableSettings
 from . import rm_ssh
 from . import rm_web_interface as rm_web_interface
 from .log_helper import log_args_kwargs
@@ -16,15 +17,9 @@ if TYPE_CHECKING:
     from calibre.devices.usbms.device import USBDevice  # type: ignore
     from calibre.ebooks.metadata.book.base import Metadata  # type: ignore
 
-PLUGIN_NAME = "Remarkable Device Plugin for Calibre"
+PLUGIN_NAME = "remarkable-calibre-usb-device"
 print("----------------------------------- REMARKABLE PLUGIN web interface ------------------------")
 device = None
-
-
-@dataclass
-class RemarkableSettings:
-    IP: str
-    SSH_PASSWORD: str
 
 
 @dataclass
@@ -38,6 +33,9 @@ class RemarkableDeviceDescription:
 
 
 class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
+    VENDOR_ID = 0x04B3
+    PRODUCT_ID = 0x4010
+
     progress = 0.0
     name = PLUGIN_NAME
     description = "Send epub and pdf files to Remarkable"
@@ -120,7 +118,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     @log_args_kwargs
     def debug_managed_device_detection(self, devices_on_system, output):
         print(
-            "Should write information about the devices detected on the system to output, which is a file like object."
+            "----- TODO: Should write information about the devices detected on the system to output, which is a file like object."
         )
         return True
 
@@ -128,6 +126,11 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     def books(self, oncard=None, end_session=True):
         settings = self.settings_obj()
         return rm_web_interface.query_tree(settings.IP, "").ls_recursive()
+    
+    def __REMOVE_THIS_books(self, oncard=None, end_session=True):
+        print("`books()` called")
+        self.sync_booklists((self.booklist, None, None))
+        return self.booklist
 
     def _create_upload_path(self, path, mdata, fname):
         from calibre.devices.utils import create_upload_path  # type: ignore
@@ -155,7 +158,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         if not metadata:
             metadata = [None] * len(files_original)
         step = 100 / len(files_original)
-        has_ssh = rm_ssh.test_connection(settings.IP)
+        has_ssh = rm_ssh.test_connection(settings)
         existing_folders = rm_web_interface.query_tree(settings.IP, "").ls_dir_recursive_dict() if has_ssh else {}
         needs_reboot = False
         for local_path, visible_name, m in zip(files_original, names, metadata):
@@ -175,7 +178,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         print(f"{folder_id_final=}")
                         if not folder_id_final:
                             part_name = parts[i]
-                            folder_id_final = rm_ssh.mkdir(settings.IP, part_name, parent_folder_id)
+                            folder_id_final = rm_ssh.mkdir(settings, part_name, parent_folder_id)
                             existing_folders[part_full] = folder_id_final
                             needs_reboot = True
                             print(f"after mkdir {folder_id_final=}")
@@ -185,16 +188,17 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             if is_new_folder:
                 rm_web_interface.upload_file(settings.IP, local_path, "", visible_name)
                 print(f"{folder_id=} != {folder_id_final=}")
-                file_id = rm_ssh.get_latest_upload_id(settings.IP)
-                rm_ssh.sed(settings.IP, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
-                needs_reboot = True
+                if has_ssh:
+                    file_id = rm_ssh.get_latest_upload_id(settings)
+                    rm_ssh.sed(settings, f"{file_id}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
+                    needs_reboot = True
             else:
                 rm_web_interface.upload_file(settings.IP, local_path, folder_id_final, visible_name)
 
             self.progress += step
 
-        if needs_reboot:
-            rm_ssh.xochitl_restart(settings.IP)
+        if needs_reboot and has_ssh:
+            rm_ssh.xochitl_restart(settings)
         self.progress = 100.0
 
     @log_args_kwargs
@@ -219,7 +223,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def total_space(self, end_session=True):
-        return 0
+        return 999999999, -1, -1
 
     @log_args_kwargs
     def get_driveinfo(self):
@@ -278,7 +282,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def free_space(self, end_session=True):
-        return -1
+        return 999999999, -1, -1
 
     @log_args_kwargs
     def temporary_file(self, suffix):
@@ -302,7 +306,37 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def sync_booklists(self, booklists, end_session=True):
-        pass  # on remarkable, metadata will be automatically be updated for epubs
+        return [], None, None
+    
+    def __REMOVE_THIS_sync_booklists(self, booklists, end_session=True):
+        # TODO -  Make this function better
+        # Ensure the booklist on device matches the local calibre booklist
+        ftp = self.conn.ssh.open_sftp()
+        try:
+            print("Attempting to open existing calibre file on device")
+            json_on_device = json.load(ftp.open(str(self.metadata_path)))
+            booklist_on_device = (
+                [RemarkableBook(**x) for x in json_on_device] if json_on_device else []
+            )
+        except FileNotFoundError as e:
+            booklist_on_device = []
+
+        # TOOD optimize this, maybe somehow hash RemarkableBookList
+        for book in booklist[0]:
+            if book not in booklist_on_device:
+                booklist_on_device.append(book)
+        ftp.putfo(
+            BytesIO(json.dumps([asdict(x) for x in booklist_on_device]).encode()),
+            str(self.metadata_path),
+        )
+
+        # Make sure our local booklist matches what's on the device too
+        for book in booklist_on_device:
+            if book not in booklist[0]:
+                booklist[0].add_book(book)
+
+        ftp.close()
+        return booklist[0], None, None
 
     @log_args_kwargs
     def prepare_addable_books(self, paths):
@@ -311,6 +345,45 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     @log_args_kwargs
     def delete_books(self, paths, end_session=True):
         return super().delete_books(paths, end_session)
+
+    #def __REMOVE_THIS_delete_books(self, paths, end_session=True):
+    #    """
+    #    Delete books at paths on device.
+    #    """
+    #    for path in paths:
+    #        parts = Path(path).parts[1:]
+    #        current = self.document_root
+    #        for part in parts:
+    #            if part in current.children.keys():
+    #                current = current.children[part]
+    #            else:
+    #                raise FileNotFoundError
+    #        print(f"Deleting {current}")
+    #        current.delete()
+    #        current.save()
+#
+    #    ftp = self.conn.ssh.open_sftp()
+    #    json_on_device = json.load(ftp.open(str(self.metadata_path)))
+    #    booklist_on_device = (
+    #        [RemarkableBook(**x) for x in json_on_device] if json_on_device else []
+    #    )
+    #    booklist_on_device = [
+    #        book for book in booklist_on_device if book.path not in paths
+    #    ]
+    #    ftp.putfo(
+    #        BytesIO(json.dumps([asdict(x) for x in booklist_on_device]).encode()),
+    #        str(self.metadata_path),
+    #    )
+#
+    #@classmethod
+    #def remove_books_from_metadata(cls, paths, booklists):
+    #    to_remove = []
+    #    for book in booklists[0]:
+    #        if book.path in paths:
+    #            to_remove.append(book)
+#
+    #    for book in to_remove:
+    #        booklists[0].remove_book(book)
 
     @log_args_kwargs
     def do_user_config(self, parent=None):
@@ -326,7 +399,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def card_prefix(self, end_session=True):
-        return ("/prefix1", "/prefix2")
+        return None, None
 
     @log_args_kwargs
     def cli_main(self, args):
@@ -342,7 +415,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     @log_args_kwargs
     def ignore_connected_device(self, uid):
-        return super().ignore_connected_device(uid)
+        pass
 
     @log_args_kwargs
     def post_yank_cleanup(self):
@@ -356,3 +429,27 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     @log_args_kwargs
     def add_books_to_metadata(cls, locations, metadata, booklists):
         pass
+
+    @classmethod
+    def __REMOVE_THIS_add_books_to_metadata(cls, locations, metadata, booklists):
+        print("Adding books to metadata")
+        print(f"locations: {locations}, metadata: {metadata}, booklists: {booklists}")
+        for i, m in enumerate(metadata):
+            title = m.get("title")
+            authors = m.get("authors")
+            tags = m.get("tags")
+            pubdate = m.get("pubdate")
+            size = m.get("size")
+            uuid = m.get("uuid")
+            path = locations[0][i]
+            b = RemarkableBook(
+                title=title,
+                authors=authors,
+                size=size,
+                datetime=pubdate.timetuple(),
+                tags=tags,
+                uuid=uuid,
+                path=path,
+            )
+            if b not in booklists[0]:
+                booklists[0].add_book(b, None)

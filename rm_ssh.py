@@ -6,30 +6,34 @@ import subprocess
 import tempfile
 import time
 import uuid
-
+from .rm_settings import RemarkableSettings
 from .log_helper import log_args_kwargs  # type: ignore
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")
 
 ssh_socketfile = "/tmp/remarkable-push.socket"
-ssh_options = "-o BatchMode=yes"
+ssh_options = "-o StrictHostKeyChecking=no -o BatchMode=yes"
 ssh_socket_options = f" -S {ssh_socketfile}" if os.name != "nt" else ""
 
 
+def ssh_address(settings: RemarkableSettings):
+    return f"root:{settings.SSH_PASSWORD}@{settings.IP}" if settings.SSH_PASSWORD else f"root@{settings.IP}"
+
+
 @log_args_kwargs
-def xochitl_restart(ip):
-    cmd = f'ssh {ssh_options} {ssh_socket_options} root@{ip} "systemctl restart xochitl"'
+def xochitl_restart(settings: RemarkableSettings):
+    cmd = f'ssh {ssh_options} {ssh_socket_options} {ssh_address(settings)} "systemctl restart xochitl"'
     subprocess.getoutput(cmd)
 
 
 @log_args_kwargs
-def _touch_home_fs(ip):
+def _touch_fs(settings: RemarkableSettings):
     """
     Test if ssh is working AND home is writable
     """
     p = subprocess.Popen(
-        f'ssh {ssh_options} root@{ip} "touch ~/calibre_remarkable_usb_device.touch"',
+        f'ssh {ssh_options} {ssh_address(settings)} "touch ~/calibre_remarkable_usb_device.touch"',
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -39,31 +43,37 @@ def _touch_home_fs(ip):
 
 
 @log_args_kwargs
-def test_connection(ip):
+def test_connection(settings: RemarkableSettings):
     """
     Test if ssh is working AND home is writable
     """
-    rw_success = _touch_home_fs(ip)
-    # if not rw_success:
-    #    p = subprocess.Popen(
-    #        f'ssh {ssh_options} root@{ip} "mount -o remount,rw /"',
-    #        shell=True,
-    #        stdout=subprocess.PIPE,
-    #        stderr=subprocess.PIPE,
-    #    )
-    #    p.wait()
-    #    rw_success = p.returncode == 0
-    return rw_success
+    try:
+        rw_success = _touch_fs(settings)
+        if not rw_success:
+            p = subprocess.Popen(
+                f'ssh {ssh_options} {ssh_address(settings)} "mount -o remount,rw /"',
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            p.wait()
+            return p.returncode == 0
+        return True
+    except Exception as e:  # noqa: E722
+        print(f"SSH test failed: {e}")
+        return False
 
 
 @log_args_kwargs
-def sed(ip, xochitl_filename, i: str, o: str):
+def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
     p = subprocess.Popen(
         (
             "ssh",
             "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
             "BatchMode=yes",
-            f"root@{ip}",
+            ssh_address(settings),
             f"sed -i -e 's/{i}/{o}/g' {XOCHITL_BASE_FOLDER}/{xochitl_filename}",
         ),
         shell=True,
@@ -74,9 +84,9 @@ def sed(ip, xochitl_filename, i: str, o: str):
 
 
 @log_args_kwargs
-def get_latest_upload_id(ip):
+def get_latest_upload_id(settings: RemarkableSettings):
     p = subprocess.run(
-        f'ssh {ssh_options} root@{ip} "cd {XOCHITL_BASE_FOLDER}; ls -Art *.metadata | tail -n 1',
+        f'ssh {ssh_options} {ssh_address(settings)} "cd {XOCHITL_BASE_FOLDER}; ls -Art *.metadata | tail -n 1',
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -85,7 +95,7 @@ def get_latest_upload_id(ip):
 
 
 @log_args_kwargs
-def mkdir(ip, visible_name, parent_id=""):
+def mkdir(settings: RemarkableSettings, visible_name, parent_id=""):
     file_id = str(uuid.uuid4())
     with tempfile.TemporaryDirectory() as tmp_folder:
         file_metadata = f"{file_id}.metadata"
@@ -108,7 +118,7 @@ def mkdir(ip, visible_name, parent_id=""):
             content_json = """{"tags": []}"""
             fp.write(content_json)
 
-        cmd = f"scp -r {tmp_folder}/* root@{ip}:{XOCHITL_BASE_FOLDER}"
+        cmd = f"scp -r {tmp_folder}/* {ssh_address(settings)}:{XOCHITL_BASE_FOLDER}"
         result = subprocess.getoutput(cmd)
         print(result)
     return file_id
