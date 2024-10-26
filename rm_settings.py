@@ -1,5 +1,3 @@
-
-
 from dataclasses import dataclass
 
 
@@ -7,3 +5,5 @@ from dataclasses import dataclass
 class RemarkableSettings:
     IP: str
     SSH_PASSWORD: str
+
+    CALIBRE_METADATA_PATH = "~/.calibre_remarkable_usb_device.metadata"

@@ -6,8 +6,9 @@ import subprocess
 import tempfile
 import time
 import uuid
-from .rm_settings import RemarkableSettings
+
 from .log_helper import log_args_kwargs  # type: ignore
+from .rm_settings import RemarkableSettings
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")
@@ -40,6 +41,32 @@ def _touch_fs(settings: RemarkableSettings):
     )
     p.wait()
     return p.returncode == 0
+
+
+@log_args_kwargs
+def init_metadata(settings: RemarkableSettings):
+    p = subprocess.Popen(
+        f'ssh {ssh_options} {ssh_address(settings)} "echo [] > {settings.CALIBRE_METADATA_PATH}"',
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    p.wait()
+    return p.returncode == 0
+
+
+@log_args_kwargs
+def scp(settings: RemarkableSettings, src_file: str, dest: str):
+    command = f"scp {src_file} {ssh_address(settings)}:{dest}"
+    print("command=%s", command)
+    p = subprocess.run(
+        command,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if p.returncode != 0:
+        raise RuntimeError(f"returncode={p.returncode}, stdout={p.stdout}")
 
 
 @log_args_kwargs
@@ -92,6 +119,20 @@ def get_latest_upload_id(settings: RemarkableSettings):
         stderr=subprocess.PIPE,
     )
     return p.stdout.strip().replace(".metadata", "")
+
+
+@log_args_kwargs
+def cat(settings: RemarkableSettings, file: str):
+    p = subprocess.run(
+        f'ssh {ssh_options} {ssh_address(settings)} "cat {file}"',
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if p.returncode != 0:
+        return None
+
+    return p.stdout.strip()
 
 
 @log_args_kwargs
