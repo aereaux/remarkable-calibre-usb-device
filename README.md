@@ -1,10 +1,7 @@
 
-Sync your epub/pdf to Remarkable with Calibre
-==========================================================
-This Calibre plugin implements Calibre's [Device Plugin](https://manual.calibre-ebook.com/plugins.html#module-calibre.devices.interface),
-making the Remarkable  Tablet a device Calibre can communicate with, similar to other supported Ebook readers.
+A Calibre [Device Plugin](https://manual.calibre-ebook.com/plugins.html#module-calibre.devices.interface) for Remarkable 2 / Remarkable Paper Pro.
 
-The plugin will create the necessary folder structure (by default under `calibre/{author_sort}/{title} - {authors}`, News feeds are uploaded to a separate folder `News`)
+The plugin supports folders and will create the necessary folder structure on the Remarkable (by default under `calibre/{author_sort}/{title} - {authors}`, News feeds are uploaded to a separate folder `News`)
 
 Requirements
 ------------
