@@ -30,7 +30,7 @@ At Calibre startup, the plugin will attempt to find your Remarkable device (by d
 
 To send a book to your Remarkable Tablet, right click on the book, select "send to device" and then "send to main memory". The book will transfer and you should now see your book in the Device tab.
 
-![](img\calibre_send_to_device.png)
+![](img/calibre_send_to_device.png)
 
 If you start Calibre and you don't see the Device tab, most likely Calibre was not able to find or connect to your Remarkable tablet. Try running Calibre in debug using `calibre-debug -g` and see the messages in the console regarding trying to connect to the device.
 
