@@ -14,7 +14,8 @@ XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")
 
 ssh_socketfile = "/tmp/remarkable-push.socket"
-ssh_options = "-o StrictHostKeyChecking=no -o BatchMode=yes"
+ssh_options2 = ["-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
+ssh_options_str = " ".join(ssh_options2)
 ssh_socket_options = f" -S {ssh_socketfile}" if os.name != "nt" else ""
 
 
@@ -24,8 +25,16 @@ def ssh_address(settings: RemarkableSettings):
 
 @log_args_kwargs
 def xochitl_restart(settings: RemarkableSettings):
-    cmd = f'ssh {ssh_options} {ssh_socket_options} {ssh_address(settings)} "systemctl restart xochitl"'
-    subprocess.getoutput(cmd)
+    p = subprocess.Popen(
+        ["ssh", *ssh_options2, ssh_address(settings), "systemctl restart xochitl"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
+    p.wait()
+    if p.returncode != 0:
+        raise SystemError(f"{p.returncode=}, {p.stdout}")
 
 
 @log_args_kwargs
@@ -34,10 +43,11 @@ def _touch_fs(settings: RemarkableSettings):
     Test if ssh is working AND home is writable
     """
     p = subprocess.Popen(
-        f'ssh {ssh_options} {ssh_address(settings)} "touch ~/calibre_remarkable_usb_device.touch"',
-        shell=True,
+        ["ssh", *ssh_options2, ssh_address(settings), "touch ~/calibre_remarkable_usb_device.touch"],
+        shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     p.wait()
     return p.returncode == 0
@@ -46,10 +56,11 @@ def _touch_fs(settings: RemarkableSettings):
 @log_args_kwargs
 def init_metadata(settings: RemarkableSettings):
     p = subprocess.Popen(
-        f'ssh {ssh_options} {ssh_address(settings)} "echo [] > {settings.CALIBRE_METADATA_PATH}"',
-        shell=True,
+        ["ssh", *ssh_options2, ssh_address(settings), f"echo [] > {settings.CALIBRE_METADATA_PATH}"],
+        shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     p.wait()
     return p.returncode == 0
@@ -57,13 +68,14 @@ def init_metadata(settings: RemarkableSettings):
 
 @log_args_kwargs
 def scp(settings: RemarkableSettings, src_file: str, dest: str):
-    command = f"scp {src_file} {ssh_address(settings)}:{dest}"
+    command = f""
     print("command=%s", command)
     p = subprocess.run(
-        command,
+        ["scp", src_file, f"{ssh_address(settings)}:{dest}"],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if p.returncode != 0:
         raise RuntimeError(f"returncode={p.returncode}, stdout={p.stdout}")
@@ -78,10 +90,11 @@ def test_connection(settings: RemarkableSettings):
         rw_success = _touch_fs(settings)
         if not rw_success:
             p = subprocess.Popen(
-                f'ssh {ssh_options} {ssh_address(settings)} "mount -o remount,rw /"',
-                shell=True,
+                ["ssh", *ssh_options2, ssh_address(settings), "mount -o remount,rw /"],
+                shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
             p.wait()
             return p.returncode == 0
@@ -103,9 +116,10 @@ def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
             ssh_address(settings),
             f"sed -i -e 's/{i}/{o}/g' {XOCHITL_BASE_FOLDER}/{xochitl_filename}",
         ),
-        shell=True,
+        shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     p.wait()
 
@@ -113,10 +127,11 @@ def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
 @log_args_kwargs
 def get_latest_upload_id(settings: RemarkableSettings):
     p = subprocess.run(
-        f'ssh {ssh_options} {ssh_address(settings)} "cd {XOCHITL_BASE_FOLDER}; ls -Art *.metadata | tail -n 1',
+        ["ssh", *ssh_options2, ssh_address(settings), f"cd {XOCHITL_BASE_FOLDER}; ls -Art *.metadata | tail -n 1"],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     return p.stdout.strip().replace(".metadata", "")
 
@@ -124,10 +139,11 @@ def get_latest_upload_id(settings: RemarkableSettings):
 @log_args_kwargs
 def cat(settings: RemarkableSettings, file: str):
     p = subprocess.run(
-        f'ssh {ssh_options} {ssh_address(settings)} "cat {file}"',
+        ["ssh", *ssh_options2, ssh_address(settings), f"cat {file}"],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if p.returncode != 0:
         return None
