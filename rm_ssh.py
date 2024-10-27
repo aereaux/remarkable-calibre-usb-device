@@ -1,5 +1,6 @@
-#!/usr/bin/env python3
 import logging
+
+#!/usr/bin/env python3
 import os
 import pathlib
 import subprocess
@@ -17,6 +18,7 @@ ssh_socketfile = "/tmp/remarkable-push.socket"
 ssh_options2 = ["-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes"]
 ssh_options_str = " ".join(ssh_options2)
 ssh_socket_options = f" -S {ssh_socketfile}" if os.name != "nt" else ""
+subprocess_creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
 def ssh_address(settings: RemarkableSettings):
@@ -30,7 +32,7 @@ def xochitl_restart(settings: RemarkableSettings):
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     p.wait()
     if p.returncode != 0:
@@ -47,7 +49,7 @@ def _touch_fs(settings: RemarkableSettings):
         shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     p.wait()
     return p.returncode == 0
@@ -60,7 +62,7 @@ def init_metadata(settings: RemarkableSettings):
         shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     p.wait()
     return p.returncode == 0
@@ -73,7 +75,7 @@ def scp(settings: RemarkableSettings, src_file: str, dest: str):
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     if p.returncode != 0:
         raise RuntimeError(f"returncode={p.returncode}, stdout={p.stdout}")
@@ -92,7 +94,7 @@ def test_connection(settings: RemarkableSettings):
                 shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=subprocess_creation_flags,
             )
             p.wait()
             return p.returncode == 0
@@ -117,7 +119,7 @@ def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
         shell=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     p.wait()
 
@@ -129,7 +131,7 @@ def get_latest_upload_uuid(settings: RemarkableSettings):
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     return p.stdout.strip().replace(".metadata", "")
 
@@ -141,7 +143,7 @@ def cat(settings: RemarkableSettings, file: str):
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        creationflags=subprocess.CREATE_NO_WINDOW,
+        creationflags=subprocess_creation_flags,
     )
     if p.returncode != 0:
         return None
