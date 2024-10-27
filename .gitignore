@@ -4,3 +4,4 @@ out
 __pycache__
 .mypy_cache
 release
+.vscode
