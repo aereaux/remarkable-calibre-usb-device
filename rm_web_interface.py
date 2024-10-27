@@ -58,6 +58,15 @@ class Node:
                 result.append(c.visible_name)
         return result
 
+    def ls_uuid(self: "Node"):
+        result = []
+        for c in self.children:
+            if c.document.Type == TypeOfDocument.CollectionType:
+                result.extend(c.ls_uuid())
+            else:
+                result.append(c.document.ID)
+        return result
+
     def ls_dir_recursive(self: "Node"):
         result = []
         for c in self.children:

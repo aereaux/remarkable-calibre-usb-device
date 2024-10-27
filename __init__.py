@@ -4,6 +4,7 @@ import json
 import logging
 import posixpath
 import tempfile
+import threading
 from dataclasses import asdict
 from typing import IO, TYPE_CHECKING, List
 
@@ -29,6 +30,8 @@ print("----------------------------------- REMARKABLE PLUGIN web interface -----
 device = None
 logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger()
+
+RM_UUID = "#rm_uuid"
 
 
 class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
@@ -98,19 +101,26 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         super().startup()
 
     @log_args_kwargs
-    def detect_managed_devices(self, devices_on_system: List[USBDevice], force_refresh=False):
+    def detect_managed_devices(self, devices_on_system: List, force_refresh=False):
         global device
         settings = self.settings_obj()
 
         try:
-            # TODO: check for USBDevice.vendor_id
-            if device is None and rm_web_interface.check_connection(settings.IP):
+            # TODO
+            matching_devices = [d for d in devices_on_system if d.vendor_id == self.VENDOR_ID and d.product_id == self.PRODUCT_ID]
+            # if not any(matching_devices):
+            #     return
+            LOGGER.info("Probably this device: %s", matching_devices)
+        except:  # noqa: E722
+            LOGGER.warning("USB device not detected", exc_info=True)
+
+        try:
+            if rm_web_interface.check_connection(settings.IP):
                 device = RemarkableDeviceDescription(settings.IP)
-                LOGGER.info(f"detected new {device=}")
-            LOGGER.info(f"returning {device=}")
-            return device
-        except Exception as e:
-            LOGGER.warning(f"No device detected {e=}", exc_info=True)
+                LOGGER.info(f"detected {device=}")
+                return device
+        except:  # noqa: E722
+            LOGGER.warning("No device detected", exc_info=True)
             device = None
             return None
 
@@ -159,11 +169,9 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             folder_id = ""
             folder_id_final = ""
             is_new_folder = False
-            title = m.get("title") or "UNKNOWN"
-            upload_path = title
+            upload_path = self._create_upload_path(m, visible_name)
             if has_ssh:
-                upload_path = self._create_upload_path(m, title)
-                upload_path = "/".join(upload_path.split("/")[:-1]) + "/" + title
+                # upload_path = "/".join(upload_path.split("/")[:-1]) + "/" + title
                 if upload_path:
                     parts = upload_path.split("/")
                     parts = parts[:-1]
@@ -185,21 +193,20 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         parent_folder_id = folder_id_final
             locations.append(upload_path)
 
-            if is_new_folder:
-                rm_web_interface.upload_file(settings.IP, local_path, "", title)
-                LOGGER.debug(f"{folder_id=} != {folder_id_final=}")
-                if has_ssh:
-                    file_uuid = rm_ssh.get_latest_upload_uuid(settings)
-                    m.set_user_metadata("rm_uuid")
+            rm_web_interface.upload_file(settings.IP, local_path, folder_id_final, visible_name)
+
+            if has_ssh:
+                file_uuid = rm_ssh.get_latest_upload_uuid(settings)
+                m.set_user_metadata(RM_UUID, {"#value#": file_uuid, "datatype": "text"})
+                if is_new_folder:
+                    LOGGER.debug(f"Creating new folder, {folder_id=} != {folder_id_final=}")
                     rm_ssh.sed(settings, f"{file_uuid}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
                     needs_reboot = True
-            else:
-                rm_web_interface.upload_file(settings.IP, local_path, folder_id_final, visible_name)
 
             self.progress += step
 
         if needs_reboot and has_ssh:
-            rm_ssh.xochitl_restart(settings)
+            rm_ssh.xochitl_restart_after(settings, 5.0)
         self.progress = 100.0
 
         return (locations, metadata, None)
@@ -315,10 +322,12 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
         booklist0, _, _ = booklists
         try:
-            existing_docs = rm_web_interface.query_tree(settings.IP, "").ls_recursive()
-            LOGGER.info("Attempting to open existing calibre file on device")
-            json_on_device = self.load_metadata(settings)
-            booklist_on_device = [b for b in map(lambda x: RemarkableBook(**x), json_on_device) if b.path in existing_docs]
+            tree = rm_web_interface.query_tree(settings.IP, "")
+            existing_docs = tree.ls_recursive() + tree.ls_uuid()
+            LOGGER.debug(f"{existing_docs=}")
+            LOGGER.info("Attempting to open existing calibre metadata on device")
+            bookslist = self.load_booklist(settings)
+            booklist_on_device = [b for b in bookslist if b.path in existing_docs or b.rm_uuid in existing_docs]
             LOGGER.info("got booklist_on_device=%s", booklist_on_device)
         except:  # noqa: E722
             LOGGER.warning("Unable to get metadata", exc_info=True)
@@ -331,7 +340,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                 booklist_on_device.append(book)
 
         with tempfile.NamedTemporaryFile("w+t", delete=False) as fp:
-            content = json.dumps([asdict(x) for x in booklist_on_device], indent=1)
+            content = json.dumps([asdict(x) for x in booklist_on_device], indent=1, sort_keys=True, default=str)
             fp.write(content)
             fp.flush()
             rm_ssh.scp(settings, fp.name, settings.CALIBRE_METADATA_PATH)
@@ -346,8 +355,9 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
         return booklist0, None, None
 
-    def load_metadata(self, settings: RemarkableSettings):
-        return json.loads(rm_ssh.cat(settings, settings.CALIBRE_METADATA_PATH)) or []
+    def load_booklist(self, settings: RemarkableSettings):
+        json_dict = json.loads(rm_ssh.cat(settings, settings.CALIBRE_METADATA_PATH)) or []
+        return list(map(lambda x: RemarkableBook(**x), json_dict))
 
     @log_args_kwargs
     def prepare_addable_books(self, paths):
@@ -358,7 +368,17 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         """
         Delete books at paths on device.
         """
-        raise NotImplementedError()
+        settings = self.settings_obj()
+        has_ssh = rm_ssh.test_connection(settings)
+        if not has_ssh:
+            raise SystemError("This feature requires SSH")
+
+        # we assume the path generated in create_upload_path is unique
+        LOGGER.debug(f"{paths=}")
+        paths = [b.rm_uuid for b in self.load_booklist(settings) if b.path in paths]
+        rm_ssh.rm(settings, paths=" ".join(f"{u}*" for u in paths))
+
+        rm_ssh.xochitl_restart_after(settings, 5.0)
 
     @classmethod
     def remove_books_from_metadata(cls, paths, booklists):
@@ -429,10 +449,10 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             title: str = m.get("title")  # type: ignore
             authors: list[str] = m.get("authors")  # type: ignore
             tags: list[str] = m.get("tags")  # type: ignore
-            pubdate = m.get("pubdate")
+            pubdate = m.get("pubdate").timetuple()
             size = m.get("size")
             uuid: str = m.get("uuid")  # type: ignore
-            rm_uuid = m.get("rm_uuid") or uuid
+            rm_uuid = m.get(RM_UUID)
             path = locations[0][i]
             b = RemarkableBook(
                 title=title,

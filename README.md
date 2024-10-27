@@ -36,6 +36,11 @@ Donate
 
 [here](https://github.com/sponsors/andriniaina) or on [patreon](https://patreon.com/andriniaina)
 
+Troubleshooting
+------
+1. On my Remarkable, there seems to be [a bug](https://www.google.com/search?q=remarkable+usb+web+interface+not+working+site%3Areddit.com) where the web interface is sometimes not responding or not properly starting. Open the URL http://10.11.99.1 in a browser and make sure the web interface is showing.
+2. make sure you can SSH to the device
+
 Thanks
 ------
 

@@ -46,7 +46,7 @@ class RemarkableBookList(BookList):
         return self
 
     def json_dumps(self):
-        return json.dumps([asdict(x) for x in self])
+        return json.dumps([asdict(x) for x in self], sort_keys=True, default=str)
 
     @staticmethod
     def json_loads(json_data):
@@ -63,6 +63,7 @@ class RemarkableBook:
     uuid: str
     rm_uuid: str = ""
     authors: list[str] = field(default_factory=list)
+    author_sort = ""
     size: int = 0
     datetime: time.struct_time = time.localtime()
     thumbnail = None
@@ -73,3 +74,7 @@ class RemarkableBook:
 
     def __eq__(self, other: RemarkableBook):  # type: ignore
         return self.rm_uuid == other.rm_uuid or self.uuid == other.uuid
+
+    def __post_init__(self):
+        # When RemarkableBook is created from a json blob the argument is a n array and must be converted properly
+        self.datetime = time.struct_time(self.datetime)

@@ -1,10 +1,10 @@
-import logging
-
 #!/usr/bin/env python3
+import logging
 import os
 import pathlib
 import subprocess
 import tempfile
+import threading
 import time
 import uuid
 
@@ -23,6 +23,11 @@ subprocess_creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 
 
 def ssh_address(settings: RemarkableSettings):
     return f"root:{settings.SSH_PASSWORD}@{settings.IP}" if settings.SSH_PASSWORD else f"root@{settings.IP}"
+
+
+@log_args_kwargs
+def xochitl_restart_after(settings: RemarkableSettings, seconds=5.0):
+    threading.Timer(seconds, lambda: xochitl_restart(settings)).start()
 
 
 @log_args_kwargs
@@ -137,6 +142,18 @@ def get_latest_upload_uuid(settings: RemarkableSettings):
 
 
 @log_args_kwargs
+def rm(settings: RemarkableSettings, paths: list[str]):
+    p = subprocess.run(
+        ["ssh", *ssh_options2, ssh_address(settings), f"cd {XOCHITL_BASE_FOLDER}; rm {paths} -Rf"],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        creationflags=subprocess_creation_flags,
+    )
+    return p.stdout.strip()
+
+
+@log_args_kwargs
 def cat(settings: RemarkableSettings, file: str):
     p = subprocess.run(
         ["ssh", *ssh_options2, ssh_address(settings), f"cat {file}"],
@@ -148,7 +165,9 @@ def cat(settings: RemarkableSettings, file: str):
     if p.returncode != 0:
         return None
 
-    return p.stdout.strip()
+    result = p.stdout.strip()
+    logging.getLogger().debug(f"cat {result=}")
+    return result
 
 
 @log_args_kwargs
