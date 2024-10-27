@@ -3,6 +3,11 @@ A Calibre [Device Plugin](https://manual.calibre-ebook.com/plugins.html#module-c
 
 The plugin supports folders and will create the necessary folder structure on the Remarkable (by default under `calibre/{author_sort}/{title} - {authors}`, News feeds are uploaded to a separate folder `News`)
 
+Features:
+* upload, using calibre folder structure
+* delete files
+* view files
+
 Requirements
 ------------
 This plugin relies on the USB web interface but optionally heavily relies on SSH for a lot of features (organizing books into folders, lookup for books on device, etc.)
