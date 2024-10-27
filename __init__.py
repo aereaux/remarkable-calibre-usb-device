@@ -169,7 +169,6 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             is_new_folder = False
             upload_path = self._create_upload_path(m, visible_name)
             if has_ssh:
-                # upload_path = "/".join(upload_path.split("/")[:-1]) + "/" + title
                 if upload_path:
                     parts = upload_path.split("/")
                     parts = parts[:-1]
@@ -179,6 +178,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         LOGGER.debug(
                             f"Looking if {part_full=} already exists on remarkable",
                         )
+                        # FIXME: does not work when folder is new, and uploading multiple files at the same time
                         folder_id_final = existing_folders.get(part_full)
                         LOGGER.debug(f"{folder_id_final=}")
                         if not folder_id_final:
@@ -191,6 +191,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
                         parent_folder_id = folder_id_final
             locations.append(upload_path)
 
+            # FIXME: fails when author has special character ';'
             rm_web_interface.upload_file(settings.IP, local_path, folder_id_final, visible_name)
 
             if has_ssh:
