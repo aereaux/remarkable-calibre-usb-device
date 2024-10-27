@@ -38,8 +38,7 @@ If you start Calibre and you don't see the Device tab, most likely Calibre was n
 
 Donate
 ------
-
-[here](https://github.com/sponsors/andriniaina) or on [patreon](https://patreon.com/andriniaina)
+I wrote this mainly for myself but if you find this useful, donate [here](https://github.com/sponsors/andriniaina) or on [patreon](https://patreon.com/andriniaina)
 
 Troubleshooting
 ------

@@ -4,7 +4,6 @@ import json
 import logging
 import posixpath
 import tempfile
-import threading
 from dataclasses import asdict
 from typing import IO, TYPE_CHECKING, List
 
@@ -22,7 +21,6 @@ from .rm_data import (
 )
 
 if TYPE_CHECKING:
-    from calibre.devices.usbms.device import USBDevice  # type: ignore
     from calibre.ebooks.metadata.book.base import Metadata  # type: ignore
 
 PLUGIN_NAME = "remarkable-calibre-usb-device"
