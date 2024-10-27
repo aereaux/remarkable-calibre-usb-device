@@ -2,6 +2,7 @@
 import dataclasses
 import io
 import json
+import logging
 import mimetypes
 import uuid
 from enum import Enum
@@ -186,7 +187,7 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
 
     # position pointer on folder
     resp = query_document(ip, folder_id)
-    print(f"{resp=}")
+    logging.getLogger().debug(f"{resp=}")
 
     # upload
     with open(local_path, "rb") as fp:
@@ -202,7 +203,6 @@ def upload_file(ip, local_path, folder_id, visible_name, **kwargs):
         # opener = request.build_opener(NonRaisingHTTPErrorProcessor)
         # with opener.open(req, **kwargs) as conn:
         with request.urlopen(req, **kwargs) as conn:
-            print(conn.status)
             return json.loads(conn.read())
 
 
@@ -211,7 +211,7 @@ def check_connection(ip: str):
         query_document(ip, "", timeout=2)
         return True
     except Exception as e:
-        print(f"Unable to connect to remarkable: {e}")
+        logging.getLogger().warn("Unable to connect to remarkable", exc_info=True)
         return False
 
 

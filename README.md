@@ -40,6 +40,6 @@ Thanks
 ------
 
 * [Calibre](https://github.com/kovidgoyal/calibre) for making a great ebook manager.
-* [naclander](https://github.com/naclander/Calibre-Remarkable-Device-Driver-Plugin) for the initial plugin.
+* [naclander](https://github.com/naclander/Calibre-Remarkable-Device-Driver-Plugin) for the original plugin.
 
 All developers in the Remarkable community.

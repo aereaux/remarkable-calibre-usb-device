@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import logging
 import os
 import pathlib
 import subprocess
@@ -8,7 +8,7 @@ import time
 import uuid
 
 from .log_helper import log_args_kwargs  # type: ignore
-from .rm_settings import RemarkableSettings
+from .rm_data import RemarkableSettings
 
 XOCHITL_BASE_FOLDER = "~/.local/share/remarkable/xochitl"
 default_prepdir = tempfile.mkdtemp(prefix="resync-")
@@ -68,8 +68,6 @@ def init_metadata(settings: RemarkableSettings):
 
 @log_args_kwargs
 def scp(settings: RemarkableSettings, src_file: str, dest: str):
-    command = f""
-    print("command=%s", command)
     p = subprocess.run(
         ["scp", src_file, f"{ssh_address(settings)}:{dest}"],
         text=True,
@@ -100,7 +98,7 @@ def test_connection(settings: RemarkableSettings):
             return p.returncode == 0
         return True
     except Exception as e:  # noqa: E722
-        print(f"SSH test failed: {e}")
+        logging.warn("SSH connection failed", exc_info=True)
         return False
 
 
@@ -125,7 +123,7 @@ def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
 
 
 @log_args_kwargs
-def get_latest_upload_id(settings: RemarkableSettings):
+def get_latest_upload_uuid(settings: RemarkableSettings):
     p = subprocess.run(
         ["ssh", *ssh_options2, ssh_address(settings), f"cd {XOCHITL_BASE_FOLDER}; ls -Art *.metadata | tail -n 1"],
         text=True,
@@ -177,5 +175,5 @@ def mkdir(settings: RemarkableSettings, visible_name, parent_id=""):
 
         cmd = f"scp -r {tmp_folder}/* {ssh_address(settings)}:{XOCHITL_BASE_FOLDER}"
         result = subprocess.getoutput(cmd)
-        print(result)
+        logging.getLogger().debug(result)
     return file_id
