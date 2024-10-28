@@ -190,9 +190,8 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
             if has_ssh:
                 file_uuid = rm_ssh.get_latest_upload_uuid(settings)
                 m.set_user_metadata(RM_UUID, {"#value#": file_uuid, "datatype": "text"})
+                rm_ssh.sed(settings, f"{file_uuid}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
                 if is_new_folder:
-                    LOGGER.debug(f"Creating new folder, {folder_id=} != {folder_id_final=}")
-                    rm_ssh.sed(settings, f"{file_uuid}.metadata", '"parent": ""', f'"parent": "{folder_id_final}"')
                     needs_reboot = True
 
             self.progress += step
