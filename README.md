@@ -12,7 +12,7 @@ Requirements
 ------------
 This plugin relies on the USB web interface but optionally heavily relies on SSH for a lot of features (organizing books into folders, lookup for books on device, etc.)
 
-If you wish to benefit of the full features, please setup SSH and ensure that you can successfully SSH to your Remarkable tablet (see [here](https://support.remarkable.com/s/article/Developer-mode) and [here](https://remarkable.guide/guide/access/ssh.html)).
+If you wish to benefit of the full features, please setup SSH and ensure that you can successfully SSH to your Remarkable tablet **without a password** (see [here](https://remarkable.guide/guide/access/ssh.html)).
 
 Installation
 ------------
@@ -24,7 +24,7 @@ Go to `Preferences-->Plugins-->Show only user installed plugins`, select the plu
 
 ![](img/calibre_settings.png)
 
-SSH password can be empty if you have setup an SSH certificate.
+The password field is for future use and DOES NOT WORK yet and is only there for future use. You **need to setup an SSH certificate** (see [here](https://remarkable.guide/guide/access/ssh.html))
 
 Usage
 -----
