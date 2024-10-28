@@ -10,8 +10,7 @@ from typing import IO, TYPE_CHECKING, List
 from calibre.devices.interface import DevicePlugin  # type: ignore
 from calibre.devices.usbms.deviceconfig import DeviceConfig  # type: ignore
 
-from . import rm_ssh
-from . import rm_web_interface as rm_web_interface
+from . import rm_ssh, rm_web_interface
 from .log_helper import log_args_kwargs
 from .rm_data import (
     RemarkableBook,
@@ -58,13 +57,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
 
     EXTRA_CUSTOMIZATION_MESSAGE = [  # type: ignore
         # -----------
-        "IP address:::"
-        "<p>"
-        "Use this option if you want to force the driver to listen on a "
-        "particular IP address. The driver will listen only on the "
-        "entered address, and this address will be the one advertised "
-        "over mDNS (BonJour)."
-        "</p>",
+        "IP address:::" "<p>" "Use this option if you want to force the driver to listen on a " "particular IP address." "</p>",
         # -----------
         "SSH password (optional):::" "<p>Required for folders support</p>",
     ]
@@ -317,6 +310,7 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
     def sync_booklists(self, booklists: tuple[RemarkableBookList, list, list], end_session=True):
         settings = self.settings_obj()
         if not rm_ssh.test_connection(settings) or booklists is None:
+            # TODO use rm_web_interface if ssh is not available
             return RemarkableBookList(), None, None
 
         booklist0, _, _ = booklists

@@ -14,6 +14,8 @@ This plugin relies on the USB web interface but optionally heavily relies on SSH
 
 If you wish to benefit of the full features, please setup SSH and ensure that you can successfully SSH to your Remarkable tablet **without a password** (see [here](https://remarkable.guide/guide/access/ssh.html)).
 
+It directly calls the ssh executable, ie: ssh should be in the PATH settings, which should be the already case on windows/osx/linux by default
+
 Installation
 ------------
 [Download](https://github.com/andriniaina/remarkable-calibre-usb-device/releases/latest) the zip file, and install it in Calibre via the Plugin interface (from the main screen: `Preferences-->Plugins-->Load plugin from file`).

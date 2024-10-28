@@ -106,7 +106,7 @@ def test_connection(settings: RemarkableSettings):
             p.wait()
             return p.returncode == 0
         return True
-    except Exception as e:  # noqa: E722
+    except:  # noqa: E722
         logging.warn("SSH connection failed", exc_info=True)
         return False
 
