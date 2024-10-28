@@ -116,10 +116,7 @@ def sed(settings: RemarkableSettings, xochitl_filename, i: str, o: str):
     p = subprocess.Popen(
         (
             "ssh",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "BatchMode=yes",
+            *ssh_options2,
             ssh_address(settings),
             f"sed -i -e 's/{i}/{o}/g' {XOCHITL_BASE_FOLDER}/{xochitl_filename}",
         ),
