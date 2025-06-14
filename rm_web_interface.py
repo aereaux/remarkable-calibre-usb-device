@@ -84,6 +84,16 @@ class Node:
                 result.update({f"{c.visible_name}/{name}": id for name, id in c.ls_dir_recursive_dict().items()})
         return result
 
+    def ls_recursive_dict(self: "Node"):
+        result = {}
+        for c in self.children:
+            if c.document.Type == TypeOfDocument.CollectionType:
+                result[c.visible_name] = c.document.ID
+                result.update({f"{c.visible_name}/{name}": id for name, id in c.ls_recursive_dict().items()})
+            else:
+                result[c.visible_name] = c.document.ID
+        return result
+
 
 @dataclasses.dataclass
 class ChildNode(Node):

@@ -7,6 +7,9 @@ import tempfile
 from dataclasses import asdict
 from typing import IO, TYPE_CHECKING, List
 
+import os
+from uuid import uuid4
+
 from calibre.devices.interface import DevicePlugin  # type: ignore
 from calibre.devices.usbms.deviceconfig import DeviceConfig  # type: ignore
 
@@ -126,7 +129,19 @@ class RemarkableUsbDevice(DeviceConfig, DevicePlugin):
         # return rm_web_interface.query_tree(settings.IP, "").ls_recursive()
         booklists = (RemarkableBookList(), None, None)
         booklist0, _, _ = self.sync_booklists(booklists)
-        return booklist0
+
+        settings = self.settings_obj()
+        device_paths = rm_web_interface.query_tree(settings.IP, "").ls_recursive_dict()
+        books = {path: uuid for path, uuid in device_paths.items() if path.startswith("Calibre")}
+        booklist_final = booklist0
+        metadata_uuids = [book.rm_uuid for book in booklist_final]
+        for path, uuid in books.items():
+            if uuid not in metadata_uuids:
+                path_parts = path.split("/")
+                if len(path_parts) == 3:
+                    print(path, uuid, metadata_uuids)
+                    booklist_final.add_book(RemarkableBook(path=path, uuid=uuid4(), title=path_parts[2]))
+        return booklist_final
 
     def _create_upload_path(self, mdata, fname):
         from calibre.devices.utils import create_upload_path  # type: ignore
